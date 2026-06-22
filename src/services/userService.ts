@@ -38,11 +38,39 @@ export const updateUserProfile = async (userId: string, data: Partial<UserProfil
   await updateDoc(docRef, data);
 };
 
-import { arrayUnion } from 'firebase/firestore';
+import { getDoc } from 'firebase/firestore';
 
 export const addFcmTokenToProfile = async (userId: string, token: string) => {
   const docRef = doc(db, 'userProfiles', userId);
-  await updateDoc(docRef, {
-    fcmTokens: arrayUnion(token)
-  });
+  const userSnap = await getDoc(docRef);
+  
+  if (userSnap.exists()) {
+    const data = userSnap.data() as UserProfile;
+    let tokens = data.fcmTokens || [];
+    
+    // Si el usuario tenía fcmToken viejo (string), lo agregamos al arreglo
+    if (data.fcmToken && !tokens.includes(data.fcmToken)) {
+      tokens.push(data.fcmToken);
+    }
+    
+    // Removemos el token si ya existía para volver a ponerlo al final (como más reciente)
+    tokens = tokens.filter(t => t !== token);
+    
+    // Añadimos el nuevo al final
+    tokens.push(token);
+    
+    // Conservamos solo los últimos 4 (los más recientes)
+    if (tokens.length > 4) {
+      tokens = tokens.slice(-4);
+    }
+    
+    await updateDoc(docRef, {
+      fcmTokens: tokens
+    });
+  } else {
+    // Si por alguna razón el perfil no existiera
+    await updateDoc(docRef, {
+      fcmTokens: [token]
+    });
+  }
 };
