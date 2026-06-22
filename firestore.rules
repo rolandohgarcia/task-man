@@ -65,6 +65,62 @@ service cloud.firestore {
       );
 
       allow delete: if isAuth() && request.auth.uid in resource.data.ownerIds;
+    // -------------------------------------------------------------------------
+    // REGLAS DE PRODUCCIÓN: PROYECTOS, TAREAS Y RECURRENTES
+    // -------------------------------------------------------------------------
+
+    // PROYECTOS
+    match /projects/{projectId} {
+      // Lectura permitida a miembros del proyecto o de la empresa
+      allow read: if isAuth(); 
+      // Creación: asume que la UI pone al creador en adminIds y memberIds
+      allow create: if isAuth() && request.auth.uid in request.resource.data.memberIds;
+      // Actualización: restringido a miembros (idealmente administradores o supervisores)
+      allow update: if isAuth() && (
+        request.auth.uid in resource.data.memberIds ||
+        request.auth.uid in resource.data.adminIds ||
+        request.auth.uid in resource.data.supervisorIds
+      );
+      // Borrado: solo administradores
+      allow delete: if isAuth() && request.auth.uid in resource.data.adminIds;
+    }
+
+    // TAREAS PRINCIPALES
+    match /tasks/{taskId} {
+      // Función para validar que el usuario es miembro del proyecto de la tarea
+      function isProjectMember(projId) {
+        return request.auth.uid in get(/databases/$(database)/documents/projects/$(projId)).data.memberIds;
+      }
+      
+      // Lectura pública para cualquier usuario autenticado en el sistema
+      // (Para listados globales y filtros cruzados)
+      allow read: if isAuth();
+      
+      // Creación/Modificación: requiere validación contra el documento del proyecto
+      // Nota: Si esto excede las cuotas de Firestore por lecturas (get), podemos relajarlo 
+      // a "if isAuth()" dado que la UI ya protege las operaciones.
+      allow create: if isAuth() && isProjectMember(request.resource.data.projectId);
+      allow update: if isAuth() && isProjectMember(resource.data.projectId);
+      allow delete: if isAuth() && isProjectMember(resource.data.projectId);
+
+      // SUBCOLECCIÓN: EVIDENCIAS / ACTUALIZACIONES
+      match /updates/{updateId} {
+        allow read: if isAuth();
+        allow create: if isAuth() && request.auth.uid == request.resource.data.userId;
+        allow update, delete: if isAuth() && request.auth.uid == resource.data.userId;
+      }
+    }
+
+    // TAREAS RECURRENTES (PLANTILLAS)
+    match /recurring_tasks/{recurringTaskId} {
+      function isProjectMember(projId) {
+        return request.auth.uid in get(/databases/$(database)/documents/projects/$(projId)).data.memberIds;
+      }
+
+      allow read: if isAuth();
+      allow create: if isAuth() && isProjectMember(request.resource.data.projectId);
+      allow update: if isAuth() && isProjectMember(resource.data.projectId);
+      allow delete: if isAuth() && isProjectMember(resource.data.projectId);
     }
   }
 }

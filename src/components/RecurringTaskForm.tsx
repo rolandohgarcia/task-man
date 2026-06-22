@@ -152,7 +152,7 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
         nextScheduledDate: firstScheduledDate,
         endDate: endDate || null,
         isActive: true
-      } as any, photos);
+      } as any);
 
       onTaskCreated();
       onClose();
@@ -250,7 +250,7 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
                             width: '40px', height: '40px', borderRadius: '50%', border: 'none',
                             backgroundColor: daysOfWeek.includes(day) ? 'var(--primary-color)' : 'var(--surface-color)',
                             color: daysOfWeek.includes(day) ? 'white' : 'var(--text-color)',
-                            fontWeight: 'bold', cursor: 'pointer', border: '1px solid var(--border-color)'
+                            fontWeight: 'bold', cursor: 'pointer'
                           }}
                         >
                           {dayNames[day]}

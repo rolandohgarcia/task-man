@@ -57,7 +57,7 @@ const RecurringTasksView = ({ user, companyId, projectId }: RecurringTasksViewPr
   };
 
   const getRecurrenceText = (task: RecurringTask) => {
-    if (task.recurrenceType === 'daily') return 'Todos los días';
+    if (task.recurrenceType === 'daily_interval') return 'Diaria';
     if (task.recurrenceType === 'weekly') {
       const daysMap = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
       const days = task.recurrenceConfig?.daysOfWeek?.map((d: number) => daysMap[d]).join(', ');
