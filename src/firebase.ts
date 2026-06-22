@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getMessaging } from "firebase/messaging";
 
@@ -20,6 +20,16 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Enable Offline Persistence
+enableMultiTabIndexedDbPersistence(db).catch((err) => {
+  if (err.code === 'failed-precondition') {
+    console.warn('Multiple tabs open, persistence can only be enabled in one tab at a a time.');
+  } else if (err.code === 'unimplemented') {
+    console.warn('The current browser does not support all of the features required to enable persistence');
+  }
+});
+
 export const storage = getStorage(app);
 
 // Messaging is tricky on mobile web (especially iOS), so we export a function 
@@ -34,6 +44,38 @@ export const getMessagingInstance = async () => {
     return null;
   } catch (error) {
     console.error("Firebase Messaging not supported", error);
+    return null;
+  }
+};
+
+export const requestNotificationPermission = async () => {
+  try {
+    const messaging = await getMessagingInstance();
+    if (!messaging) return null;
+    
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const { getToken } = await import('firebase/messaging');
+      // Asegúrate de que VITE_FIREBASE_VAPID_KEY esté en el archivo .env
+      const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+      if (!vapidKey) {
+        console.warn('Falta el VAPID_KEY en .env para notificaciones push');
+        return null;
+      }
+      
+      const currentToken = await getToken(messaging, { vapidKey });
+      if (currentToken) {
+        return currentToken;
+      } else {
+        console.log('No se pudo obtener el token de registro. Pide permisos para generar uno.');
+        return null;
+      }
+    } else {
+      console.log('Permiso de notificación no concedido.');
+      return null;
+    }
+  } catch (error) {
+    console.error('Ocurrió un error al intentar obtener el token.', error);
     return null;
   }
 };

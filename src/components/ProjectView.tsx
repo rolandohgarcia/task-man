@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { User } from 'firebase/auth';
-import { getProjectTasks, createTask } from '../services/taskService';
+import { subscribeToProjectTasks, createTask } from '../services/taskService';
 import type { Task } from '../services/taskService';
 import { getProjectById, addUserToProject, removeUserFromProject } from '../services/projectService';
 import type { Project } from '../services/projectService';
@@ -46,10 +46,7 @@ const ProjectView = ({ user }: ProjectViewProps) => {
     setLoadingTasks(true);
     setLoadingMembers(true);
     try {
-      // Load tasks
-      const ts = await getProjectTasks(projectId);
-      setTasks(ts);
-      setLoadingTasks(false);
+      // Tasks are now loaded via onSnapshot in useEffect
 
       // Load project and members
       const proj = await getProjectById(projectId);
@@ -75,11 +72,18 @@ const ProjectView = ({ user }: ProjectViewProps) => {
 
   useEffect(() => {
     loadData();
+    if (projectId) {
+      const unsub = subscribeToProjectTasks(projectId, (newTasks) => {
+        setTasks(newTasks);
+        setLoadingTasks(false);
+      });
+      return () => unsub();
+    }
   }, [projectId, companyId]);
 
   const handleTaskCreated = () => {
     setShowTaskModal(false);
-    loadData();
+    // Tasks will update automatically via subscription
   };
 
   const handleAddUser = async (e: React.FormEvent) => {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { User } from 'firebase/auth';
-import { getTaskUpdates, createTaskUpdate, getTaskById } from '../services/taskService';
+import { subscribeToTaskUpdates, createTaskUpdate, subscribeToTaskById } from '../services/taskService';
 import type { TaskUpdate, Task } from '../services/taskService';
 import { getUsersByIds } from '../services/userService';
 import type { UserProfile } from '../services/userService';
@@ -31,45 +31,41 @@ const TaskView = ({ user }: TaskViewProps) => {
   const [previews, setPreviews] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [wasValidated, setWasValidated] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // Lightbox State
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
-  const loadUpdates = async () => {
+  useEffect(() => {
     if (!taskId) return;
     setLoading(true);
-    try {
-      const [upds, tsk] = await Promise.all([
-        getTaskUpdates(taskId),
-        getTaskById(taskId)
-      ]);
-      setUpdates(upds);
+
+    let unsubTask = subscribeToTaskById(taskId, (tsk) => {
       setTask(tsk);
-      
+      setLoading(false);
+    });
+
+    let unsubUpdates = subscribeToTaskUpdates(taskId, async (upds) => {
+      setUpdates(upds);
       if (upds.length > 0) {
         setProgress(upds[0].progressReported);
         setCurrentMaxProgress(upds[0].progressReported);
       }
-
-      // Fetch user profiles for the updates
+      
       const userIds = Array.from(new Set(upds.map(u => u.userId)));
       if (userIds.length > 0) {
         const profiles = await getUsersByIds(userIds);
         const map: Record<string, UserProfile> = {};
         profiles.forEach(p => map[p.id] = p);
-        setUsersMap(map);
+        setUsersMap(prev => ({ ...prev, ...map }));
       }
+    });
 
-    } catch (error) {
-      console.error("Error loading updates", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadUpdates();
+    return () => {
+      unsubTask();
+      unsubUpdates();
+    };
   }, [taskId]);
 
   const handlePhotosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,15 +95,16 @@ const TaskView = ({ user }: TaskViewProps) => {
 
     setIsSubmitting(true);
     try {
-      await createTaskUpdate(taskId, user.uid, comment, progress, photos.length > 0 ? photos : undefined);
+      await createTaskUpdate(taskId, user.uid, comment, progress, photos);
       
-      // Reset Form
+      // Reset form
       setComment('');
       setPhotos([]);
       setPreviews([]);
       setShowUpdateModal(false);
+      setWasValidated(false);
+      // Data is now updated automatically via onSnapshot!
       
-      await loadUpdates();
     } catch (error) {
       console.error(error);
       alert("Error al subir el avance");
@@ -124,9 +121,40 @@ const TaskView = ({ user }: TaskViewProps) => {
           <button onClick={() => navigate(-1)} className="btn btn-outline" style={{ width: 'auto', minHeight: '40px', padding: '0 10px' }}>
             <ArrowLeft size={20} />
           </button>
-          <h2>Historial de Avances</h2>
+          <h2>{task?.title || 'Detalles de Tarea'}</h2>
         </div>
       </div>
+
+      {/* Tarea Original Info */}
+      {task && (
+        <div className="card" style={{ marginTop: 'var(--spacing-md)', backgroundColor: 'var(--surface-color)' }}>
+          <p style={{ margin: '0 0 var(--spacing-sm) 0', fontSize: '0.95rem' }}>{task.description || 'Sin descripción detallada.'}</p>
+          
+          <div style={{ display: 'flex', gap: 'var(--spacing-md)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            <span><strong>Prioridad:</strong> {task.priority}</span>
+            <span><strong>Límite:</strong> {task.deadline}</span>
+          </div>
+
+          {task.referenceImages && task.referenceImages.length > 0 && (
+            <div style={{ marginTop: 'var(--spacing-md)' }}>
+              <strong>Imágenes de Referencia:</strong>
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginTop: '8px', paddingBottom: '8px' }}>
+                {task.referenceImages.map((url, i) => (
+                  <div 
+                    key={i} 
+                    onClick={() => setLightboxImage(url)}
+                    style={{ minWidth: '100px', height: '100px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    <img src={url} alt={`Referencia ${i+1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <h3 style={{ marginTop: 'var(--spacing-lg)' }}>Historial de Avances</h3>
 
       {/* Updates History */}
       <div className="flex-col" style={{ marginTop: 'var(--spacing-md)' }}>
@@ -292,18 +320,38 @@ const TaskView = ({ user }: TaskViewProps) => {
                 multiple
                 capture="environment" 
                 style={{ display: 'none' }}
-                ref={fileInputRef}
+                ref={cameraInputRef}
+                onChange={handlePhotosChange}
+              />
+              <input 
+                type="file" 
+                accept="image/*" 
+                multiple
+                style={{ display: 'none' }}
+                ref={galleryInputRef}
                 onChange={handlePhotosChange}
               />
               
-              <button 
-                type="button" 
-                className="btn btn-outline" 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isSubmitting}
-              >
-                <Camera size={20} style={{ marginRight: '8px' }}/> Agregar Fotos
-              </button>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={isSubmitting}
+                  style={{ flex: 1 }}
+                >
+                  <Camera size={20} style={{ marginRight: '8px' }}/> Tomar Foto
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  onClick={() => galleryInputRef.current?.click()}
+                  disabled={isSubmitting}
+                  style={{ flex: 1 }}
+                >
+                  <ImageIcon size={20} style={{ marginRight: '8px' }}/> Subir Galería
+                </button>
+              </div>
 
             </form>
           </div>

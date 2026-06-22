@@ -8,7 +8,8 @@ import {
   where, 
   serverTimestamp,
   updateDoc,
-  orderBy
+  orderBy,
+  onSnapshot
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
@@ -108,6 +109,15 @@ export const getProjectTasks = async (projectId: string) => {
   return querySnapshot.docs.map(doc => doc.data() as Task);
 };
 
+export const subscribeToProjectTasks = (projectId: string, callback: (tasks: Task[]) => void) => {
+  const tasksRef = collection(db, 'tasks');
+  const q = query(tasksRef, where('projectId', '==', projectId));
+  return onSnapshot(q, (snapshot) => {
+    const tasks = snapshot.docs.map(doc => doc.data() as Task);
+    callback(tasks);
+  });
+};
+
 // 2b. Get a single task by ID
 export const getTaskById = async (taskId: string) => {
   const taskRef = doc(db, 'tasks', taskId);
@@ -116,6 +126,17 @@ export const getTaskById = async (taskId: string) => {
     return taskSnap.data() as Task;
   }
   return null;
+};
+
+export const subscribeToTaskById = (taskId: string, callback: (task: Task | null) => void) => {
+  const taskRef = doc(db, 'tasks', taskId);
+  return onSnapshot(taskRef, (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data() as Task);
+    } else {
+      callback(null);
+    }
+  });
 };
 
 // 3. Compress Image (Client Side)
@@ -191,12 +212,30 @@ export const getTaskUpdates = async (taskId: string) => {
   return querySnapshot.docs.map(doc => doc.data() as TaskUpdate);
 };
 
+export const subscribeToTaskUpdates = (taskId: string, callback: (updates: TaskUpdate[]) => void) => {
+  const updatesRef = collection(db, `tasks/${taskId}/updates`);
+  const q = query(updatesRef, orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    const updates = snapshot.docs.map(doc => doc.data() as TaskUpdate);
+    callback(updates);
+  });
+};
+
 // 6. Get global tasks where the user is directly assigned
 export const getGlobalUserTasks = async (userId: string) => {
   const tasksRef = collection(db, 'tasks');
   const q = query(tasksRef, where('assignedUserIds', 'array-contains', userId));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => doc.data() as Task);
+};
+
+export const subscribeToGlobalUserTasks = (userId: string, callback: (tasks: Task[]) => void) => {
+  const tasksRef = collection(db, 'tasks');
+  const q = query(tasksRef, where('assignedUserIds', 'array-contains', userId));
+  return onSnapshot(q, (snapshot) => {
+    const tasks = snapshot.docs.map(doc => doc.data() as Task);
+    callback(tasks);
+  });
 };
 
 // 7. Get global tasks belonging to projects where the user is a member
@@ -219,6 +258,34 @@ export const getGlobalSupervisedTasks = async (projectIds: string[]) => {
   }
   
   return allTasks;
+};
+
+export const subscribeToGlobalSupervisedTasks = (projectIds: string[], callback: (tasks: Task[]) => void) => {
+  if (projectIds.length === 0) {
+    callback([]);
+    return () => {};
+  }
+  
+  const tasksRef = collection(db, 'tasks');
+  const chunks = [];
+  for (let i = 0; i < projectIds.length; i += 10) {
+    chunks.push(projectIds.slice(i, i + 10));
+  }
+  
+  const unsubscribes: (() => void)[] = [];
+  const tasksMap = new Map<string, Task[]>();
+
+  chunks.forEach((chunk, index) => {
+    const q = query(tasksRef, where('projectId', 'in', chunk));
+    const unsub = onSnapshot(q, (snapshot) => {
+      tasksMap.set(index.toString(), snapshot.docs.map(doc => doc.data() as Task));
+      const allTasks = Array.from(tasksMap.values()).flat();
+      callback(allTasks);
+    });
+    unsubscribes.push(unsub);
+  });
+
+  return () => unsubscribes.forEach(unsub => unsub());
 };
 
 // 8. Upload reference images
@@ -248,6 +315,34 @@ export const createRecurringTask = async (data: Omit<RecurringTask, 'id' | 'crea
 
   await setDoc(recurringRef, newRecurringTask);
   return newRecurringTask;
+};
+
+export const subscribeToGlobalRecurringTasks = (projectIds: string[], callback: (tasks: RecurringTask[]) => void) => {
+  if (projectIds.length === 0) {
+    callback([]);
+    return () => {};
+  }
+  
+  const recurringRef = collection(db, 'recurring_tasks');
+  const chunks = [];
+  for (let i = 0; i < projectIds.length; i += 10) {
+    chunks.push(projectIds.slice(i, i + 10));
+  }
+  
+  const unsubscribes: (() => void)[] = [];
+  const tasksMap = new Map<string, RecurringTask[]>();
+
+  chunks.forEach((chunk, index) => {
+    const q = query(recurringRef, where('projectId', 'in', chunk), where('isActive', '==', true));
+    const unsub = onSnapshot(q, (snapshot) => {
+      tasksMap.set(index.toString(), snapshot.docs.map(doc => doc.data() as RecurringTask));
+      const allRecurring = Array.from(tasksMap.values()).flat();
+      callback(allRecurring);
+    });
+    unsubscribes.push(unsub);
+  });
+
+  return () => unsubscribes.forEach(unsub => unsub());
 };
 
 // 10. Get Recurring Tasks

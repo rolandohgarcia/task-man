@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, CheckCircle, Clock, Filter, AlertCircle, CalendarDays, Repeat, Trash2, ClipboardList, Eye, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getGlobalUserTasks, getGlobalSupervisedTasks, getGlobalRecurringTasks, deactivateRecurringTask } from '../services/taskService';
+import { subscribeToGlobalUserTasks, subscribeToGlobalSupervisedTasks, subscribeToGlobalRecurringTasks, deactivateRecurringTask } from '../services/taskService';
 import type { Task, RecurringTask } from '../services/taskService';
 import { getUserCompanies } from '../services/companyService';
 import type { Company } from '../services/companyService';
@@ -69,41 +69,51 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
   useEffect(() => { localStorage.setItem('globalCalendarDate', calendarDate.toISOString()); }, [calendarDate]);
   useEffect(() => { localStorage.setItem('globalCalendarView', calendarView); }, [calendarView]);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      // Load user's projects for colors and names
-      const projects = await getUserProjects(user.uid);
-      const projMap: Record<string, Project> = {};
-      projects.forEach(p => { projMap[p.id] = p; });
-      setProjectsMap(projMap);
-
-      // Load tasks
-      const mine = await getGlobalUserTasks(user.uid);
-      
-      let supervised: Task[] = [];
-      let recurring: RecurringTask[] = [];
-      const projectIds = projects.map(p => p.id);
-      if (projectIds.length > 0) {
-        supervised = await getGlobalSupervisedTasks(projectIds);
-        recurring = await getGlobalRecurringTasks(projectIds);
-      }
-
-      const { activeCompanies } = await getUserCompanies(user.uid);
-      setCompanies(activeCompanies);
-
-      setMyTasks(mine);
-      setSupervisedTasks(supervised);
-      setRecurringTasks(recurring);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadData();
+    let unsubMine: (() => void) | undefined;
+    let unsubSupervised: (() => void) | undefined;
+    let unsubRecurring: (() => void) | undefined;
+
+    const initData = async () => {
+      setLoading(true);
+      try {
+        const [projects, { activeCompanies }] = await Promise.all([
+          getUserProjects(user.uid),
+          getUserCompanies(user.uid)
+        ]);
+
+        const projMap: Record<string, Project> = {};
+        projects.forEach(p => { projMap[p.id] = p; });
+        setProjectsMap(projMap);
+        setCompanies(activeCompanies);
+
+        unsubMine = subscribeToGlobalUserTasks(user.uid, (tasks) => {
+          setMyTasks(tasks);
+        });
+
+        const projectIds = projects.map(p => p.id);
+        if (projectIds.length > 0) {
+          unsubSupervised = subscribeToGlobalSupervisedTasks(projectIds, (tasks) => {
+            setSupervisedTasks(tasks);
+          });
+          unsubRecurring = subscribeToGlobalRecurringTasks(projectIds, (tasks) => {
+            setRecurringTasks(tasks);
+          });
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initData();
+
+    return () => {
+      if (unsubMine) unsubMine();
+      if (unsubSupervised) unsubSupervised();
+      if (unsubRecurring) unsubRecurring();
+    };
   }, [user]);
 
   // Process lists based on the active tab

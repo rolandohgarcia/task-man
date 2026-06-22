@@ -174,3 +174,66 @@ exports.generateScheduledTasks = functions.pubsub.schedule('0 1 * * *').timeZone
     return null;
   }
 });
+
+// Notificaciones Push al asignar una tarea
+exports.onTaskCreated = functions.firestore
+  .document('tasks/{taskId}')
+  .onCreate(async (snap, context) => {
+    const newTask = snap.data();
+    const taskId = context.params.taskId;
+
+    // Si la tarea no tiene usuarios asignados, no hacemos nada
+    if (!newTask.assignedUserIds || newTask.assignedUserIds.length === 0) {
+      return null;
+    }
+
+    // Obtenemos los perfiles de los usuarios asignados para sacar sus FCM Tokens
+    const tokens = [];
+    const db = admin.firestore();
+    
+    for (const userId of newTask.assignedUserIds) {
+      const userDoc = await db.collection('userProfiles').doc(userId).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        if (userData.fcmToken) {
+          tokens.push(userData.fcmToken);
+        }
+      }
+    }
+
+    if (tokens.length === 0) {
+      console.log('No hay tokens FCM para notificar a los usuarios asignados.');
+      return null;
+    }
+
+    const payload = {
+      notification: {
+        title: '¡Nueva tarea asignada!',
+        body: `Se te ha asignado la tarea: ${newTask.title}`,
+      },
+      data: {
+        taskId: taskId,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK', 
+        url: `/task/${taskId}` 
+      }
+    };
+
+    try {
+      const response = await admin.messaging().sendMulticast({
+        tokens: tokens,
+        ...payload
+      });
+      console.log(`Se enviaron ${response.successCount} mensajes correctamente.`);
+      if (response.failureCount > 0) {
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            console.error('Error al enviar al token:', tokens[idx], resp.error);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error enviando notificaciones FCM:', error);
+    }
+
+    return null;
+  });

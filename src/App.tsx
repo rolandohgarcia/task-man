@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
+import { requestNotificationPermission } from './firebase';
+import { updateUserProfile } from './services/userService';
 
 // Components
 import Login from './components/Login';
@@ -26,6 +28,15 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+      
+      // Solicitar permisos de notificación si el usuario inició sesión
+      if (currentUser) {
+        requestNotificationPermission().then(token => {
+          if (token) {
+            updateUserProfile(currentUser.uid, { fcmToken: token }).catch(console.error);
+          }
+        });
+      }
     });
     return () => unsubscribe();
   }, []);
