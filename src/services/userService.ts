@@ -6,7 +6,7 @@ export interface UserProfile {
   email: string;
   displayName?: string;
   emoji?: string;
-  fcmToken?: string;
+  fcmTokens?: string[];
 }
 
 export const getUsersByIds = async (userIds: string[]) => {
@@ -36,4 +36,13 @@ export const getUsersByIds = async (userIds: string[]) => {
 export const updateUserProfile = async (userId: string, data: Partial<UserProfile>) => {
   const docRef = doc(db, 'userProfiles', userId);
   await updateDoc(docRef, data);
+};
+
+import { arrayUnion } from 'firebase/firestore';
+
+export const addFcmTokenToProfile = async (userId: string, token: string) => {
+  const docRef = doc(db, 'userProfiles', userId);
+  await updateDoc(docRef, {
+    fcmTokens: arrayUnion(token)
+  });
 };

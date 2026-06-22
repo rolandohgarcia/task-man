@@ -33,7 +33,9 @@ function App() {
       if (currentUser) {
         requestNotificationPermission().then(token => {
           if (token) {
-            updateUserProfile(currentUser.uid, { fcmToken: token }).catch(console.error);
+            import('./services/userService').then(({ addFcmTokenToProfile }) => {
+              addFcmTokenToProfile(currentUser.uid, token).catch(console.error);
+            });
           }
         });
       }

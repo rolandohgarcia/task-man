@@ -195,7 +195,9 @@ exports.onTaskCreated = functions.firestore
       const userDoc = await db.collection('userProfiles').doc(userId).get();
       if (userDoc.exists) {
         const userData = userDoc.data();
-        if (userData.fcmToken) {
+        if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+          tokens.push(...userData.fcmTokens);
+        } else if (userData.fcmToken) {
           tokens.push(userData.fcmToken);
         }
       }
