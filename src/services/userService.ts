@@ -6,6 +6,7 @@ export interface UserProfile {
   email: string;
   displayName?: string;
   emoji?: string;
+  fcmToken?: string;
 }
 
 export const getUsersByIds = async (userIds: string[]) => {

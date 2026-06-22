@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const { addDays, setDate, addMonths, isAfter, getDay, startOfDay, format, addYears, setMonth, startOfMonth, lastDayOfMonth } = require('date-fns');
 

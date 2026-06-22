@@ -205,7 +205,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
   const handleDeleteRecurring = async (id: string, title: string) => {
     if (window.confirm(`¿Estás seguro de que deseas eliminar la tarea recurrente "${title}"? Ya no se generarán más tareas automáticamente.`)) {
       await deactivateRecurringTask(id);
-      loadData();
+      // No need to loadData(), onSnapshot will update the list
     }
   };
 
@@ -579,7 +579,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
         <TaskForm 
           user={user} 
           onClose={() => setShowTaskForm(false)} 
-          onTaskCreated={loadData} 
+          onTaskCreated={() => {}} 
         />
       )}
 
@@ -587,7 +587,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
         <RecurringTaskForm 
           user={user} 
           onClose={() => setShowRecurringForm(false)} 
-          onTaskCreated={loadData} 
+          onTaskCreated={() => {}} 
         />
       )}
 
