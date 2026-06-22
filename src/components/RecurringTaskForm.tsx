@@ -1,0 +1,422 @@
+import React, { useState, useEffect } from 'react';
+import { X, Check } from 'lucide-react';
+import type { User } from 'firebase/auth';
+import { getProjectById } from '../services/projectService';
+import type { Project } from '../services/projectService';
+import { getUsersByIds } from '../services/userService';
+import type { UserProfile } from '../services/userService';
+import { createRecurringTask, calculateNextScheduledDate } from '../services/taskService';
+import type { RecurrenceType, RecurrenceConfig } from '../services/taskService';
+import { format } from 'date-fns';
+
+interface RecurringTaskFormProps {
+  user: User;
+  defaultProjectId?: string;
+  defaultCompanyId?: string;
+  onClose: () => void;
+  onTaskCreated: () => void;
+}
+
+const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, onTaskCreated }: RecurringTaskFormProps) => {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectId, setProjectId] = useState(defaultProjectId || '');
+  
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState<'Baja' | 'Media' | 'Alta' | 'Urgente'>('Media');
+  const [durationDays, setDurationDays] = useState(1);
+  const [endDate, setEndDate] = useState('');
+  
+  const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
+  const [requiresEvidence, setRequiresEvidence] = useState(false);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+
+  // Recurrence state
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('daily_interval');
+  const [interval, setIntervalVal] = useState(1);
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([1]); // Default Lunes
+  const [dayOfMonth, setDayOfMonth] = useState(1);
+  const [targetDate, setTargetDate] = useState('');
+  const [weekOfMonth, setWeekOfMonth] = useState(1);
+  const [dayOfWeek, setDayOfWeek] = useState(1);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [wasValidated, setWasValidated] = useState(false);
+  
+  // Member selection
+  const [projectMembers, setProjectMembers] = useState<UserProfile[]>([]);
+  const [showMemberSelect, setShowMemberSelect] = useState(false);
+  
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+  useEffect(() => {
+    const fetchProject = async () => {
+      if (!defaultProjectId) return;
+      try {
+        const proj = await getProjectById(defaultProjectId);
+        if (proj) setProjects([proj]);
+      } catch (err) {
+        console.error("Error fetching project", err);
+      }
+    };
+    fetchProject();
+  }, [defaultProjectId]);
+
+  useEffect(() => {
+    const loadMembers = async () => {
+      if (!projectId) {
+        setProjectMembers([]);
+        return;
+      }
+      const proj = projects.find(p => p.id === projectId);
+      if (proj) {
+        const members = await getUsersByIds(proj.memberIds);
+        setProjectMembers(members);
+      }
+    };
+    loadMembers();
+  }, [projectId, projects]);
+
+  const toggleDayOfWeek = (day: number) => {
+    if (daysOfWeek.includes(day)) {
+      setDaysOfWeek(daysOfWeek.filter(d => d !== day));
+    } else {
+      setDaysOfWeek([...daysOfWeek, day]);
+    }
+  };
+
+  const getRecurrenceConfig = (): RecurrenceConfig => {
+    switch (recurrenceType) {
+      case 'daily_interval': return { interval };
+      case 'monthly_interval': return { interval };
+      case 'weekly': return { daysOfWeek: daysOfWeek.length > 0 ? daysOfWeek : [1] };
+      case 'monthly_date': return { dayOfMonth };
+      case 'yearly_date': return { targetDate: targetDate || todayStr };
+      case 'monthly_specific_day': return { weekOfMonth, dayOfWeek };
+      default: return {};
+    }
+  };
+
+  const nextDatePreview1 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig());
+  const nextDatePreview2 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), nextDatePreview1);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
+      setPhotos(prev => [...prev, ...selectedFiles]);
+      
+      const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
+      setPreviews(prev => [...prev, ...newPreviews]);
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWasValidated(true);
+    const form = e.currentTarget as HTMLFormElement;
+    if (!form.checkValidity()) return;
+    if (!projectId) return;
+
+    setIsSubmitting(true);
+    try {
+      let finalCompanyId = defaultCompanyId;
+      if (!finalCompanyId) {
+        const proj = projects.find(p => p.id === projectId);
+        if (!proj) throw new Error('Project not found');
+        finalCompanyId = proj.companyId;
+      }
+
+      const config = getRecurrenceConfig();
+      const firstScheduledDate = calculateNextScheduledDate(recurrenceType, config);
+
+      await createRecurringTask({
+        projectId,
+        companyId: finalCompanyId,
+        title,
+        description,
+        priority,
+        durationDays,
+        assignedUserIds,
+        requiresEvidence,
+        recurrenceType,
+        recurrenceConfig: config,
+        nextScheduledDate: firstScheduledDate,
+        endDate: endDate || null,
+        isActive: true
+      } as any, photos);
+
+      onTaskCreated();
+      onClose();
+    } catch (error) {
+      console.error(error);
+      alert('Error al crear tarea recurrente');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const dayNames = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', width: '100vw', height: '100vh', maxWidth: 'none', maxHeight: 'none', borderRadius: 0 }}>
+        
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: 'var(--spacing-md)', backgroundColor: 'var(--surface-color)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0, zIndex: 10 }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-color)', cursor: 'pointer', marginRight: 'var(--spacing-md)' }}>
+            <X size={28} />
+          </button>
+          <h2 style={{ margin: 0, flex: 1 }}>Crear Tarea Recurrente</h2>
+          <button 
+            form="recurringTaskForm" type="submit" onClick={() => setWasValidated(true)}
+            className="btn" disabled={isSubmitting} style={{ width: 'auto', padding: '8px 16px', minHeight: 'auto', backgroundColor: 'var(--primary-color)' }}
+          >
+            {isSubmitting ? 'Guardando...' : 'Crear Tarea'}
+          </button>
+        </div>
+
+        <div style={{ padding: 'var(--spacing-md)', maxWidth: '800px', margin: '0 auto', width: '100%', overflowY: 'auto', flex: 1, paddingBottom: '100px' }}>
+          
+          <form id="recurringTaskForm" onSubmit={handleSubmit} className={`flex-col ${wasValidated ? 'was-validated' : ''}`}>
+            
+            {/* Proyecto y Tarea Info */}
+            <div className="card" style={{ marginBottom: 'var(--spacing-md)', backgroundColor: 'var(--surface-color)' }}>
+              {!defaultProjectId && (
+                <>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Proyecto*</label>
+                  <select className="input" value={projectId} onChange={e => { setProjectId(e.target.value); setAssignedUserIds([]); }} required>
+                    <option value="">Selecciona un proyecto</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+
+              <label style={{ fontSize: '0.9rem', fontWeight: 'bold', marginTop: defaultProjectId ? 0 : 'var(--spacing-md)' }}>Título de la Tarea*</label>
+              <input type="text" className="input" value={title} onChange={e => setTitle(e.target.value)} required placeholder="Ej: Reporte Mensual de Ventas" />
+
+              <label style={{ fontSize: '0.9rem', fontWeight: 'bold', marginTop: 'var(--spacing-md)' }}>Instrucciones (Opcional)</label>
+              <textarea className="input" value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Pasos detallados..." />
+            </div>
+
+            {/* Configuración de Recurrencia */}
+            <div className="card" style={{ marginBottom: 'var(--spacing-md)', borderLeft: '4px solid var(--primary-color)' }}>
+              <h3 style={{ marginTop: 0, marginBottom: 'var(--spacing-md)' }}>Patrón de Repetición</h3>
+              
+              <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Tipo Recurrencia*</label>
+              <select className="input" value={recurrenceType} onChange={(e: any) => setRecurrenceType(e.target.value)} required>
+                <option value="daily_interval">Diaria (Por Intervalo)</option>
+                <option value="weekly">Semanal (Días específicos)</option>
+                <option value="monthly_date">Mensual (Día exacto)</option>
+                <option value="monthly_specific_day">Día Mes Específico (Ej. Tercer Jueves)</option>
+                <option value="monthly_interval">Por Meses (Intervalo mensual)</option>
+                <option value="yearly_date">Anual (Fecha exacta)</option>
+              </select>
+
+              <div style={{ marginTop: 'var(--spacing-md)', padding: 'var(--spacing-md)', backgroundColor: 'var(--background-color)', borderRadius: 'var(--border-radius-sm)' }}>
+                {recurrenceType === 'daily_interval' && (
+                  <>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Repetir cada (Días)*</label>
+                    <input type="number" min="1" className="input" value={interval} onChange={e => setIntervalVal(parseInt(e.target.value))} required />
+                  </>
+                )}
+                
+                {recurrenceType === 'monthly_interval' && (
+                  <>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Repetir cada (Meses)*</label>
+                    <input type="number" min="1" className="input" value={interval} onChange={e => setIntervalVal(parseInt(e.target.value))} required />
+                  </>
+                )}
+
+                {recurrenceType === 'weekly' && (
+                  <>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Días de la semana*</label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                      {[1, 2, 3, 4, 5, 6, 0].map(day => ( // L, M, M, J, V, S, D
+                        <button
+                          key={day} type="button"
+                          onClick={() => toggleDayOfWeek(day)}
+                          style={{
+                            width: '40px', height: '40px', borderRadius: '50%', border: 'none',
+                            backgroundColor: daysOfWeek.includes(day) ? 'var(--primary-color)' : 'var(--surface-color)',
+                            color: daysOfWeek.includes(day) ? 'white' : 'var(--text-color)',
+                            fontWeight: 'bold', cursor: 'pointer', border: '1px solid var(--border-color)'
+                          }}
+                        >
+                          {dayNames[day]}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {recurrenceType === 'monthly_date' && (
+                  <>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>¿Qué día del mes? (1-31)*</label>
+                    <input type="number" min="1" max="31" className="input" value={dayOfMonth} onChange={e => setDayOfMonth(parseInt(e.target.value))} required />
+                  </>
+                )}
+
+                {recurrenceType === 'yearly_date' && (
+                  <>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Fecha Anual*</label>
+                    <input type="date" className="input" value={targetDate} onChange={e => setTargetDate(e.target.value)} required />
+                  </>
+                )}
+
+                {recurrenceType === 'monthly_specific_day' && (
+                  <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Semana*</label>
+                      <select className="input" value={weekOfMonth} onChange={e => setWeekOfMonth(parseInt(e.target.value))} required>
+                        <option value="1">Primera</option>
+                        <option value="2">Segunda</option>
+                        <option value="3">Tercera</option>
+                        <option value="4">Cuarta</option>
+                        <option value="-1">Última</option>
+                      </select>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Día*</label>
+                      <select className="input" value={dayOfWeek} onChange={e => setDayOfWeek(parseInt(e.target.value))} required>
+                        <option value="1">Lunes</option>
+                        <option value="2">Martes</option>
+                        <option value="3">Miércoles</option>
+                        <option value="4">Jueves</option>
+                        <option value="5">Viernes</option>
+                        <option value="6">Sábado</option>
+                        <option value="0">Domingo</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 'var(--spacing-md)' }}>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--success-color)', fontWeight: 'bold' }}>
+                  Próxima fecha generada: {nextDatePreview1}
+                </p>
+                <p style={{ margin: 0, marginTop: '4px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                  Siguiente fecha generada: {nextDatePreview2}
+                </p>
+              </div>
+
+              <hr style={{ margin: 'var(--spacing-md) 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
+
+              <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Tiempo para completar (Días)*</label>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Se sumará a la fecha de creación para calcular la Fecha Límite.</p>
+              <input type="number" min="1" className="input" value={durationDays} onChange={e => setDurationDays(parseInt(e.target.value))} required />
+
+              <label style={{ fontSize: '0.9rem', fontWeight: 'bold', marginTop: 'var(--spacing-md)' }}>Fecha de Terminación (Opcional)</label>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Si se deja vacío, la tarea se repetirá indefinidamente hasta que se borre.</p>
+              <input type="date" className="input" value={endDate} min={todayStr} onChange={e => setEndDate(e.target.value)} />
+            </div>
+
+            {/* Asignación y Prioridad */}
+            <div className="card" style={{ marginBottom: 'var(--spacing-md)', backgroundColor: 'var(--surface-color)' }}>
+              <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Prioridad*</label>
+                  <select className="input" value={priority} onChange={(e: any) => setPriority(e.target.value)} required>
+                    <option value="Baja">Baja</option>
+                    <option value="Media">Media</option>
+                    <option value="Alta">Alta</option>
+                    <option value="Urgente">Urgente</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 'var(--spacing-md)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-sm)' }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', margin: 0 }}>Usuarios Asignados</label>
+                  {projectId && (
+                    <button type="button" onClick={() => setShowMemberSelect(!showMemberSelect)} className="btn btn-outline" style={{ width: 'auto', padding: '4px 8px', fontSize: '0.8rem', minHeight: 'auto' }}>
+                      {showMemberSelect ? 'Cerrar Lista' : 'Elegir Usuarios'}
+                    </button>
+                  )}
+                </div>
+                
+                {showMemberSelect && projectMembers.length > 0 && (
+                  <div style={{ backgroundColor: 'var(--background-color)', padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-sm)', marginBottom: 'var(--spacing-sm)', maxHeight: '200px', overflowY: 'auto' }}>
+                    {projectMembers.map(member => (
+                      <label key={member.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', cursor: 'pointer', borderBottom: '1px solid var(--border-color)' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={assignedUserIds.includes(member.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setAssignedUserIds([...assignedUserIds, member.id]);
+                            else setAssignedUserIds(assignedUserIds.filter(id => id !== member.id));
+                          }}
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.2rem' }}>{member.emoji || '👤'}</span>
+                          <span>{member.displayName || member.email}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                
+                {assignedUserIds.length > 0 ? (
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    {assignedUserIds.map(id => {
+                      const u = projectMembers.find(m => m.id === id);
+                      return (
+                        <span key={id} style={{ fontSize: '0.8rem', backgroundColor: 'var(--primary-color)', color: 'white', padding: '2px 8px', borderRadius: '12px' }}>
+                          {u?.displayName || 'Usuario'}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>Cualquier miembro del proyecto podrá completarla si no asignas a nadie.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Evidencia y Fotos */}
+            <div className="card" style={{ marginBottom: 'var(--spacing-md)', backgroundColor: 'var(--surface-color)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                <input type="checkbox" checked={requiresEvidence} onChange={e => setRequiresEvidence(e.target.checked)} />
+                Forzar foto de evidencia al completar
+              </label>
+
+              <div style={{ marginTop: 'var(--spacing-md)' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 'bold', display: 'block', marginBottom: 'var(--spacing-sm)' }}>Fotos de Referencia (Ejemplo visual)</label>
+                {previews.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: 'var(--spacing-sm)' }}>
+                    {previews.map((src, i) => (
+                      <div key={i} style={{ position: 'relative', width: '80px', height: '80px' }}>
+                        <img src={src} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--border-radius-sm)' }} />
+                        <button type="button" onClick={() => removePhoto(i)} style={{ position: 'absolute', top: '-8px', right: '-8px', background: 'var(--danger-color)', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label className="btn btn-outline" style={{ display: 'inline-flex', width: 'auto', padding: '8px 16px', minHeight: 'auto', cursor: 'pointer' }}>
+                  <input type="file" multiple accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
+                  + Agregar Fotos
+                </label>
+              </div>
+            </div>
+            
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default RecurringTaskForm;
