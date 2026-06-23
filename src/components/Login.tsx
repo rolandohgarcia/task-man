@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { loginUser } from '../services/authService';
+import { loginUser, resetPassword } from '../services/authService';
 import { LogIn } from 'lucide-react';
 
 const Login = () => {
@@ -25,6 +25,20 @@ const Login = () => {
       setError(t('login_error') || 'Error al iniciar sesión. Verifica tus credenciales.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError(t('please_enter_email') || 'Por favor ingresa tu correo electrónico para restablecer tu contraseña.');
+      return;
+    }
+    setError('');
+    try {
+      await resetPassword(email);
+      alert('Correo de restablecimiento de contraseña enviado. Revisa tu bandeja de entrada.');
+    } catch (err: any) {
+      setError('Error al enviar el correo de restablecimiento. Verifica que tu correo esté registrado.');
     }
   };
 
@@ -79,6 +93,23 @@ const Login = () => {
               required
               autoComplete="current-password"
             />
+          </div>
+
+          <div style={{ textAlign: 'right', marginBottom: 'var(--spacing-md)' }}>
+            <button 
+              type="button" 
+              onClick={handleResetPassword}
+              style={{ 
+                background: 'none', 
+                border: 'none', 
+                color: 'var(--text-muted)', 
+                textDecoration: 'underline', 
+                cursor: 'pointer',
+                fontSize: '0.85rem'
+              }}
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
           </div>
 
           <button type="submit" className="btn" disabled={loading} style={{ marginTop: 'var(--spacing-sm)' }}>

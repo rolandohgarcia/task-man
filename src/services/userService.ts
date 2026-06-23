@@ -56,12 +56,12 @@ export const addFcmTokenToProfile = async (userId: string, token: string) => {
     // Removemos el token si ya existía para volver a ponerlo al final (como más reciente)
     tokens = tokens.filter(t => t !== token);
     
-    // Añadimos el nuevo al final
-    tokens.push(token);
+    // Añadimos el nuevo al principio
+    tokens.unshift(token);
     
-    // Conservamos solo los últimos 4 (los más recientes)
+    // Conservamos solo los primeros 4 (los más recientes)
     if (tokens.length > 4) {
-      tokens = tokens.slice(-4);
+      tokens = tokens.slice(0, 4);
     }
     
     await updateDoc(docRef, {
