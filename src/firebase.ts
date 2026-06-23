@@ -10,7 +10,7 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  appId: "1:851609085907:web:d0970a0dde88357bd5f126", // Forzado para Firebase App Hosting
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 

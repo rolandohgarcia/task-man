@@ -7,7 +7,7 @@ const firebaseConfig = {
   projectId: "task-man-3ca46",
   storageBucket: "task-man-3ca46.firebasestorage.app",
   messagingSenderId: "851609085907",
-  appId: "1:851609085907:web:f9b95b4c639b3d79d5f126",
+  appId: "1:851609085907:web:d0970a0dde88357bd5f126",
   measurementId: "G-28XVXWBGDT"
 };
 
