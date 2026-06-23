@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Menu, X, LogOut, Settings, Globe, Moon, CheckSquare, Building2, User as UserIcon } from 'lucide-react';
 import { logoutUser } from '../services/authService';
-import { updateUserProfile, getUsersByIds } from '../services/userService';
+import { updateUserProfile, getUsersByIds, addFcmTokenToProfile } from '../services/userService';
 import type { UserProfile } from '../services/userService';
+import { requestNotificationPermission } from '../firebase';
 import type { User } from 'firebase/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -23,6 +24,7 @@ const Navbar = ({ user, toggleTheme, toggleLanguage }: NavbarProps) => {
   const [editName, setEditName] = useState('');
   const [editEmoji, setEditEmoji] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -55,6 +57,26 @@ const Navbar = ({ user, toggleTheme, toggleLanguage }: NavbarProps) => {
       alert("Error al actualizar perfil");
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleEnableNotifications = async () => {
+    if (!user) return;
+    setNotificationStatus('solicitando');
+    try {
+      const token = await requestNotificationPermission();
+      if (token) {
+        await addFcmTokenToProfile(user.uid, token);
+        setNotificationStatus('éxito');
+        alert('¡Notificaciones habilitadas correctamente!');
+      } else {
+        setNotificationStatus('denegado');
+        alert('No se pudieron habilitar las notificaciones. Verifica los permisos de tu navegador o dispositivo.');
+      }
+    } catch (err) {
+      console.error("Error al habilitar notificaciones:", err);
+      setNotificationStatus('error');
+      alert('Ocurrió un error al intentar habilitar las notificaciones.');
     }
   };
 
@@ -189,6 +211,22 @@ const Navbar = ({ user, toggleTheme, toggleLanguage }: NavbarProps) => {
                 style={{ padding: '8px', minHeight: 'auto' }}
               >
                 {isSavingProfile ? 'Guardando...' : 'Guardar Perfil'}
+              </button>
+            </div>
+
+            {/* Notificaciones */}
+            <div className="card" style={{ padding: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+              <h4 style={{ margin: '0 0 var(--spacing-sm) 0' }}>Notificaciones</h4>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 'var(--spacing-sm)' }}>
+                Si no recibes alertas, puedes forzar la habilitación de notificaciones en este dispositivo.
+              </p>
+              <button 
+                className="btn btn-outline" 
+                onClick={handleEnableNotifications}
+                disabled={notificationStatus === 'solicitando'}
+                style={{ padding: '8px', minHeight: 'auto', width: '100%' }}
+              >
+                {notificationStatus === 'solicitando' ? 'Solicitando...' : 'Habilitar Notificaciones'}
               </button>
             </div>
 
