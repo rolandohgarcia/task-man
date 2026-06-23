@@ -81,16 +81,43 @@ export const requestNotificationPermission = async () => {
       console.log('[PUSH] SW Registrado y Activo:', registration.scope);
 
       console.log('[PUSH] Obteniendo token de FCM...');
-      const currentToken = await getToken(messaging, { 
-        vapidKey,
-        serviceWorkerRegistration: registration
-      });
-      
-      if (currentToken) {
-        console.log('[PUSH] Token obtenido con éxito:', currentToken.substring(0, 15) + '...');
-        return currentToken;
-      } else {
-        console.warn('[PUSH] No se pudo obtener el token (currentToken es nulo).');
+      try {
+        const currentToken = await getToken(messaging, { 
+          vapidKey,
+          serviceWorkerRegistration: registration
+        });
+        
+        if (currentToken) {
+          console.log('[PUSH] Token obtenido con éxito:', currentToken.substring(0, 15) + '...');
+          return currentToken;
+        } else {
+          console.log('[PUSH] No se pudo obtener el token (no disponible).');
+          return null;
+        }
+      } catch (err: any) {
+        console.error('[PUSH] ERROR CRÍTICO obteniendo el token:', err);
+        
+        // Auto-curación: Si el token falla por 401/Unauthorized (muy común si el AppID cambió y hay caché viejo en la PWA)
+        if (err.message && err.message.includes('authentication credential')) {
+          console.log('[PUSH] AUTO-CURACIÓN: Detectado caché corrupto o AppID viejo. Limpiando datos de FCM locales...');
+          try {
+            // 1. Desregistrar todos los Service Workers
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (let r of regs) {
+              await r.unregister();
+            }
+            // 2. Borrar las bases de datos de IndexedDB usadas por Firebase FCM e Installations
+            indexedDB.deleteDatabase('firebase-installations-database');
+            indexedDB.deleteDatabase('firebase-messaging-database');
+            indexedDB.deleteDatabase('fcm_token_details_db');
+            
+            alert("Hemos detectado una actualización crítica de seguridad en el sistema de notificaciones. La aplicación se recargará para aplicar los cambios y luego podrás habilitarlas de nuevo.");
+            window.location.reload();
+          } catch (cleanupErr) {
+            console.error('[PUSH] Error durante la auto-curación:', cleanupErr);
+          }
+        }
+        
         return null;
       }
     } else {
