@@ -109,8 +109,10 @@ export const requestNotificationPermission = async () => {
       if (subscription && debugFisToken) {
         console.log('[PUSH] [DEBUG MASIVO] 3. Simulando fetch RAW...');
         try {
-          const p256dh = btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-          const authKey = btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          const p256dhBuffer = subscription.getKey('p256dh') as ArrayBuffer;
+          const authBuffer = subscription.getKey('auth') as ArrayBuffer;
+          const p256dh = btoa(String.fromCharCode(...new Uint8Array(p256dhBuffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          const authKey = btoa(String.fromCharCode(...new Uint8Array(authBuffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
           
           const res = await fetch(`https://fcmregistrations.googleapis.com/v1/projects/${firebaseConfig.projectId}/registrations`, {
             method: 'POST',
