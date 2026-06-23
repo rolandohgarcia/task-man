@@ -81,58 +81,6 @@ export const requestNotificationPermission = async () => {
       console.log('[PUSH] SW Registrado y Activo:', registration.scope);
 
       console.log('[PUSH] Obteniendo token de FCM...');
-      
-      // --- DEBUG MASIVO ---
-      console.log('[PUSH] [DEBUG MASIVO] 1. Probando Firebase Installations...');
-      let debugFisToken = "";
-      try {
-        const { getInstallations, getToken: getInstallationsToken } = await import('firebase/installations');
-        const installations = getInstallations(app);
-        debugFisToken = await getInstallationsToken(installations);
-        console.log('[PUSH] [DEBUG MASIVO] FIS Token:', debugFisToken ? 'SÍ' : 'NO');
-      } catch (e) {
-        console.error('[PUSH] [DEBUG MASIVO ERROR] FIS falló:', e);
-      }
-
-      console.log('[PUSH] [DEBUG MASIVO] 2. Solicitando PushSubscription...');
-      let subscription;
-      try {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: vapidKey
-        });
-        console.log('[PUSH] [DEBUG MASIVO] PushSubscription:', subscription ? 'SÍ' : 'NO');
-      } catch (e) {
-        console.error('[PUSH] [DEBUG MASIVO ERROR] pushManager falló:', e);
-      }
-
-      if (subscription && debugFisToken) {
-        console.log('[PUSH] [DEBUG MASIVO] 3. Simulando fetch RAW...');
-        try {
-          const p256dhBuffer = subscription.getKey('p256dh') as ArrayBuffer;
-          const authBuffer = subscription.getKey('auth') as ArrayBuffer;
-          const p256dh = btoa(String.fromCharCode(...new Uint8Array(p256dhBuffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-          const authKey = btoa(String.fromCharCode(...new Uint8Array(authBuffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-          
-          const res = await fetch(`https://fcmregistrations.googleapis.com/v1/projects/${firebaseConfig.projectId}/registrations`, {
-            method: 'POST',
-            headers: {
-              'x-goog-api-key': firebaseConfig.apiKey || "",
-              'x-goog-firebase-installations-auth': debugFisToken,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              web: { endpoint: subscription.endpoint, auth: authKey, p256dh: p256dh }
-            })
-          });
-          const text = await res.text();
-          console.error('[PUSH] [DEBUG MASIVO RAW HTTP] Status:', res.status, 'Body:', text);
-        } catch (e) {
-          console.error('[PUSH] [DEBUG MASIVO ERROR] fetch falló:', e);
-        }
-      }
-      // --------------------
-
       const currentToken = await getToken(messaging, { 
         vapidKey,
         serviceWorkerRegistration: registration
