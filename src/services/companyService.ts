@@ -133,3 +133,11 @@ export const removeUserFromCompany = async (companyId: string, userId: string) =
     userIds: arrayRemove(userId)
   });
 };
+
+// 6. Revoke pending invitation
+export const revokeInvitation = async (companyId: string, userId: string) => {
+  const companyRef = doc(db, 'companies', companyId);
+  await updateDoc(companyRef, {
+    pendingMembers: arrayRemove(userId)
+  });
+};

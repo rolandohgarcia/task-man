@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { User } from 'firebase/auth';
 import { getCompanyProjects, createProject } from '../services/projectService';
 import type { Project } from '../services/projectService';
-import { getCompanyById, inviteUserByEmail, removeUserFromCompany } from '../services/companyService';
+import { getCompanyById, inviteUserByEmail, removeUserFromCompany, revokeInvitation } from '../services/companyService';
 import type { Company } from '../services/companyService';
 import { getUsersByIds } from '../services/userService';
 import type { UserProfile } from '../services/userService';
@@ -22,6 +22,7 @@ const CompanyView = ({ user }: CompanyViewProps) => {
   const [company, setCompany] = useState<Company | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<UserProfile[]>([]);
+  const [pendingMembers, setPendingMembers] = useState<UserProfile[]>([]);
   
   const [loading, setLoading] = useState(true);
   
@@ -53,8 +54,11 @@ const CompanyView = ({ user }: CompanyViewProps) => {
       const projs = await getCompanyProjects(companyId, user.uid);
       setProjects(projs);
 
-      const mems = await getUsersByIds(comp.memberIds);
+      const mems = await getUsersByIds(comp.memberIds || []);
       setMembers(mems);
+
+      const pendingMems = await getUsersByIds(comp.pendingMembers || []);
+      setPendingMembers(pendingMems);
 
     } catch (error) {
       console.error("Error loading company data", error);
@@ -95,6 +99,7 @@ const CompanyView = ({ user }: CompanyViewProps) => {
       alert(`Invitación enviada a ${inviteEmail}.`);
       setInviteEmail('');
       setShowInviteModal(false);
+      loadData();
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -102,19 +107,32 @@ const CompanyView = ({ user }: CompanyViewProps) => {
     }
   };
 
-  const handleRemoveMember = async (userIdToRemove: string) => {
+  const handleRemoveUser = async (userId: string, userName: string) => {
     if (!companyId) return;
-    if (!window.confirm('¿Estás seguro que deseas remover a este usuario de toda la EMPRESA? Perderá acceso a todos sus proyectos aquí.')) return;
-
-    try {
-      await removeUserFromCompany(companyId, userIdToRemove);
-      await loadData();
-    } catch (error) {
-      console.error(error);
-      alert("Error al remover miembro");
+    if (window.confirm(`¿Estás seguro de eliminar a ${userName} de la empresa? Perderá acceso a todos los proyectos.`)) {
+      try {
+        await removeUserFromCompany(companyId, userId);
+        loadData();
+      } catch (error) {
+        console.error(error);
+        alert("Error al eliminar usuario");
+      }
     }
   };
 
+  const handleRevokeInvite = async (userId: string, userName: string) => {
+    if (!companyId) return;
+    if (window.confirm(`¿Estás seguro de cancelar la invitación de ${userName}?`)) {
+      try {
+        await revokeInvitation(companyId, userId);
+        loadData();
+      } catch (error) {
+        console.error(error);
+        alert("Error al cancelar invitación");
+      }
+    }
+  };
+  
   const isOwnerOrManager = company?.ownerIds.includes(user.uid) || company?.managerIds.includes(user.uid);
 
   return (
@@ -301,7 +319,7 @@ const CompanyView = ({ user }: CompanyViewProps) => {
                     </div>
                     {isOwnerOrManager && member.id !== user.uid && (
                       <button 
-                        onClick={() => handleRemoveMember(member.id)} 
+                        onClick={() => handleRemoveUser(member.id, member.displayName || member.email)} 
                         className="btn btn-outline" 
                         style={{ width: 'auto', border: 'none', color: 'var(--danger-color)', padding: '8px' }}
                         title="Remover de la Empresa"
@@ -313,6 +331,34 @@ const CompanyView = ({ user }: CompanyViewProps) => {
                 );
               })}
             </div>
+          )}
+
+          {pendingMembers.length > 0 && (
+            <>
+              <h3 style={{ marginTop: 'var(--spacing-lg)' }}>Invitaciones Pendientes</h3>
+              <div className="flex-col">
+                {pendingMembers.map(pm => (
+                  <div key={pm.id} className="card flex-row" style={{ justifyContent: 'space-between', padding: 'var(--spacing-sm) var(--spacing-md)' }}>
+                    <div className="flex-col" style={{ gap: '4px' }}>
+                      <span>{pm.email}</span>
+                      <span style={{ width: 'fit-content', fontSize: '0.85rem', padding: '4px 8px', backgroundColor: '#e0e0e0', color: '#333', borderRadius: '12px', fontWeight: 'bold' }}>
+                        Pendiente
+                      </span>
+                    </div>
+                    {isOwnerOrManager && (
+                      <button 
+                        onClick={() => handleRevokeInvite(pm.id, pm.email)} 
+                        className="btn btn-outline" 
+                        style={{ width: 'auto', border: 'none', color: 'var(--danger-color)', padding: '8px' }}
+                        title="Cancelar Invitación"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}
