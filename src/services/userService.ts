@@ -48,10 +48,7 @@ export const addFcmTokenToProfile = async (userId: string, token: string) => {
     const data = userSnap.data() as UserProfile;
     let tokens = data.fcmTokens || [];
     
-    // Si el usuario tenía fcmToken viejo (string), lo agregamos al arreglo
-    if (data.fcmToken && !tokens.includes(data.fcmToken)) {
-      tokens.push(data.fcmToken);
-    }
+
     
     // Removemos el token si ya existía para volver a ponerlo al final (como más reciente)
     tokens = tokens.filter(t => t !== token);
