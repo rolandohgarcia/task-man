@@ -4,13 +4,15 @@ import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/fires
 import { getStorage } from "firebase/storage";
 import { getMessaging } from "firebase/messaging";
 import { getInstallations, getToken as getInstallationsToken } from "firebase/installations";
-const firebaseConfig = {
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  appId: isLocalhost ? "1:851609085907:web:f9b95b4c639b3d79d5f126" : "1:851609085907:web:d0970a0dde88357bd5f126",
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
