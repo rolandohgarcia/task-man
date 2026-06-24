@@ -362,9 +362,9 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
                 <div style={{ padding: '12px', backgroundColor: 'var(--background-color)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-color)' }}>Previsualización de la agenda:</p>
                   <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    <li><strong style={{ color: 'var(--success-color)' }}>1ª Ejecución:</strong> {nextDatePreview1}</li>
-                    <li><strong>2ª Ejecución:</strong> {nextDatePreview2}</li>
-                    <li><strong>3ª Ejecución:</strong> {nextDatePreview3}</li>
+                    <li><strong style={{ color: 'var(--success-color)' }}>1ª Ejecución:</strong> {endDate && nextDatePreview1 > endDate ? <span style={{ color: 'var(--danger-color)', fontStyle: 'italic' }}>Cancelada (Excede fecha límite)</span> : nextDatePreview1}</li>
+                    <li><strong>2ª Ejecución:</strong> {endDate && nextDatePreview2 > endDate ? <span style={{ color: 'var(--danger-color)', fontStyle: 'italic' }}>Cancelada (Excede fecha límite)</span> : nextDatePreview2}</li>
+                    <li><strong>3ª Ejecución:</strong> {endDate && nextDatePreview3 > endDate ? <span style={{ color: 'var(--danger-color)', fontStyle: 'italic' }}>Cancelada (Excede fecha límite)</span> : nextDatePreview3}</li>
                   </ul>
                 </div>
               </div>
