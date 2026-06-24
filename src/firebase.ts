@@ -85,14 +85,46 @@ export const requestNotificationPermission = async () => {
       console.log('[PUSH] Obteniendo token de FCM...');
       
       try {
-        // Inicializar explícitamente Firebase Installations
-        // (Esto previene un bug interno del SDK de Firebase donde getToken falla con 401 Unauthorized 
-        // si el FIS token no se genera con anticipación).
+        // --- WORKAROUND PARA BUG DEL SDK DE FIREBASE ---
+        // Generamos la suscripción y el FIS token manualmente antes de llamar a getToken.
+        // Esto evita el error 401 Unauthorized interno del SDK.
         const { getInstallations, getToken: getInstallationsToken } = await import("firebase/installations");
         const installations = getInstallations(app);
-        await getInstallationsToken(installations);
-      } catch (fisError) {
-        console.warn('[PUSH] Advertencia pre-cargando FIS Token:', fisError);
+        const fisToken = await getInstallationsToken(installations);
+
+        if (registration && fisToken) {
+          const sub = await registration.pushManager.getSubscription() || await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: vapidKey
+          });
+          
+          const p256dhBuffer = sub.getKey('p256dh') as ArrayBuffer;
+          const authBuffer = sub.getKey('auth') as ArrayBuffer;
+          
+          if (p256dhBuffer && authBuffer) {
+            const p256dh = btoa(String.fromCharCode.apply(null, new Uint8Array(p256dhBuffer) as unknown as number[])).replace(/\+/g, '-').replace(/\//g, '_');
+            const auth = btoa(String.fromCharCode.apply(null, new Uint8Array(authBuffer) as unknown as number[])).replace(/\+/g, '-').replace(/\//g, '_');
+            
+            // Forzar el registro manual a Google Cloud
+            await fetch(`https://fcmregistrations.googleapis.com/v1/projects/${firebaseConfig.projectId}/registrations`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': firebaseConfig.apiKey || "",
+                'x-goog-firebase-installations-auth': fisToken,
+              },
+              body: JSON.stringify({
+                web: {
+                  endpoint: sub.endpoint,
+                  p256dh: p256dh,
+                  auth: auth
+                }
+              })
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[PUSH] Advertencia en el workaround manual:', e);
       }
 
       try {
