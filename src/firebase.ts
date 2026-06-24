@@ -103,9 +103,16 @@ export const requestNotificationPermission = async () => {
           try {
             if (!sessionStorage.getItem('fcm_healed')) {
               sessionStorage.setItem('fcm_healed', 'true');
-              // 1. Desregistrar todos los Service Workers
+              // 1. Destruir la suscripción Push nativa del navegador
               const regs = await navigator.serviceWorker.getRegistrations();
               for (let r of regs) {
+                if (r.pushManager) {
+                  const sub = await r.pushManager.getSubscription();
+                  if (sub) {
+                    console.log('[PUSH] Destruyendo suscripción Push nativa...');
+                    await sub.unsubscribe();
+                  }
+                }
                 await r.unregister();
               }
               // 2. Borrar las bases de datos de IndexedDB usadas por Firebase FCM e Installations
@@ -113,7 +120,7 @@ export const requestNotificationPermission = async () => {
               indexedDB.deleteDatabase('firebase-messaging-database');
               indexedDB.deleteDatabase('fcm_token_details_db');
               
-              alert("Actualizando sistema de notificaciones en tu dispositivo. La página se recargará una sola vez.");
+              alert("Limpieza profunda de notificaciones completada. La página se recargará para aplicar los cambios.");
               window.location.reload();
             } else {
               console.error('[PUSH] La auto-curación ya se ejecutó en esta sesión y no funcionó.');
