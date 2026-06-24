@@ -128,7 +128,14 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
     }
   };
 
-  const nextDatePreview1 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), startDate || undefined);
+  const getFirstScheduledDate = () => {
+    if (recurrenceType === 'daily_interval' || recurrenceType === 'monthly_interval') {
+      return startDate || todayStr;
+    }
+    return calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), startDate || undefined);
+  };
+
+  const nextDatePreview1 = getFirstScheduledDate();
   const nextDatePreview2 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), nextDatePreview1);
   const nextDatePreview3 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), nextDatePreview2);
 
@@ -167,7 +174,7 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
       }
 
       const config = getRecurrenceConfig();
-      const firstScheduledDate = calculateNextScheduledDate(recurrenceType, config, startDate || undefined);
+      const firstScheduledDate = getFirstScheduledDate();
 
       await createRecurringTask({
         projectId,
