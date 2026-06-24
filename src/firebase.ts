@@ -83,6 +83,18 @@ export const requestNotificationPermission = async () => {
       console.log('[PUSH] SW Registrado y Activo:', registration.scope);
 
       console.log('[PUSH] Obteniendo token de FCM...');
+      
+      try {
+        // Inicializar explícitamente Firebase Installations
+        // (Esto previene un bug interno del SDK de Firebase donde getToken falla con 401 Unauthorized 
+        // si el FIS token no se genera con anticipación).
+        const { getInstallations, getToken: getInstallationsToken } = await import("firebase/installations");
+        const installations = getInstallations(app);
+        await getInstallationsToken(installations);
+      } catch (fisError) {
+        console.warn('[PUSH] Advertencia pre-cargando FIS Token:', fisError);
+      }
+
       try {
         const currentToken = await getToken(messaging, { 
           vapidKey,
