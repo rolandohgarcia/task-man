@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check } from 'lucide-react';
 import type { User } from 'firebase/auth';
-import { getProjectById } from '../services/projectService';
+import { getProjectById, getUserProjects } from '../services/projectService';
 import type { Project } from '../services/projectService';
+import { getUserCompanies } from '../services/companyService';
+import type { Company } from '../services/companyService';
 import { getUsersByIds } from '../services/userService';
 import type { UserProfile } from '../services/userService';
 import { createRecurringTask, calculateNextScheduledDate } from '../services/taskService';
@@ -20,6 +22,12 @@ interface RecurringTaskFormProps {
 const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, onTaskCreated }: RecurringTaskFormProps) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState(defaultProjectId || '');
+  
+  // Global creation support
+  const [availableCompanies, setAvailableCompanies] = useState<Company[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(defaultCompanyId || '');
+  const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -51,17 +59,38 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   useEffect(() => {
-    const fetchProject = async () => {
-      if (!defaultProjectId) return;
-      try {
-        const proj = await getProjectById(defaultProjectId);
-        if (proj) setProjects([proj]);
-      } catch (err) {
-        console.error("Error fetching project", err);
+    // Load available companies and projects if opened globally
+    const loadGlobalData = async () => {
+      if (!defaultProjectId) {
+        const [companiesData, projectsData] = await Promise.all([
+          getUserCompanies(user.uid),
+          getUserProjects(user.uid)
+        ]);
+        setAvailableCompanies(companiesData.activeCompanies);
+        setAvailableProjects(projectsData);
+      } else {
+        try {
+          const proj = await getProjectById(defaultProjectId);
+          if (proj) setProjects([proj]);
+        } catch (err) {
+          console.error("Error fetching project", err);
+        }
       }
     };
-    fetchProject();
-  }, [defaultProjectId]);
+    loadGlobalData();
+  }, [defaultProjectId, user.uid]);
+
+  // Filter projects when company is selected
+  useEffect(() => {
+    if (!defaultProjectId) {
+      if (selectedCompanyId) {
+        setFilteredProjects(availableProjects.filter(p => p.companyId === selectedCompanyId));
+      } else {
+        setFilteredProjects([]);
+      }
+      setProjectId(''); // Reset project if company changes
+    }
+  }, [selectedCompanyId, availableProjects, defaultProjectId]);
 
   useEffect(() => {
     const loadMembers = async () => {
@@ -69,14 +98,14 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
         setProjectMembers([]);
         return;
       }
-      const proj = projects.find(p => p.id === projectId);
+      const proj = (projects.length > 0 ? projects : availableProjects).find(p => p.id === projectId);
       if (proj) {
         const members = await getUsersByIds(proj.memberIds);
         setProjectMembers(members);
       }
     };
     loadMembers();
-  }, [projectId, projects]);
+  }, [projectId, projects, availableProjects]);
 
   const toggleDayOfWeek = (day: number) => {
     if (daysOfWeek.includes(day)) {
@@ -128,9 +157,9 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
 
     setIsSubmitting(true);
     try {
-      let finalCompanyId = defaultCompanyId;
+      let finalCompanyId = defaultCompanyId || selectedCompanyId;
       if (!finalCompanyId) {
-        const proj = projects.find(p => p.id === projectId);
+        const proj = (projects.length > 0 ? projects : availableProjects).find(p => p.id === projectId);
         if (!proj) throw new Error('Project not found');
         finalCompanyId = proj.companyId;
       }
@@ -192,13 +221,25 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
             <div className="card" style={{ marginBottom: 'var(--spacing-md)', backgroundColor: 'var(--surface-color)' }}>
               {!defaultProjectId && (
                 <>
-                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Proyecto*</label>
-                  <select className="input" value={projectId} onChange={e => { setProjectId(e.target.value); setAssignedUserIds([]); }} required>
-                    <option value="">Selecciona un proyecto</option>
-                    {projects.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Empresa*</label>
+                  <select className="input" value={selectedCompanyId} onChange={e => setSelectedCompanyId(e.target.value)} required>
+                    <option value="">Selecciona una empresa</option>
+                    {availableCompanies.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
+
+                  {selectedCompanyId && (
+                    <>
+                      <label style={{ fontSize: '0.9rem', fontWeight: 'bold', marginTop: 'var(--spacing-md)' }}>Proyecto*</label>
+                      <select className="input" value={projectId} onChange={e => { setProjectId(e.target.value); setAssignedUserIds([]); }} required>
+                        <option value="">Selecciona un proyecto</option>
+                        {filteredProjects.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
                 </>
               )}
 
