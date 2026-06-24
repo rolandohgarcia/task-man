@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRecurringTasks, deactivateRecurringTask } from '../services/taskService';
+import { getRecurringTasks, deleteRecurringTask } from '../services/taskService';
 import type { RecurringTask } from '../services/taskService';
 import { getProjectById } from '../services/projectService';
 import type { Project } from '../services/projectService';
@@ -50,8 +50,8 @@ const RecurringTasksView = ({ user, companyId, projectId }: RecurringTasksViewPr
   }, [companyId]);
 
   const handleDelete = async (id: string, title: string) => {
-    if (window.confirm(`¿Estás seguro de que deseas eliminar la plantilla recurrente "${title}"? Ya no se generarán más tareas automáticamente.`)) {
-      await deactivateRecurringTask(id);
+    if (window.confirm(`¿Estás seguro de que deseas eliminar permanentemente la plantilla recurrente "${title}"? Ya no se generarán más tareas automáticamente y no se puede deshacer.`)) {
+      await deleteRecurringTask(id);
       loadData();
     }
   };

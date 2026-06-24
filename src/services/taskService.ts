@@ -9,7 +9,8 @@ import {
   serverTimestamp,
   updateDoc,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  deleteDoc
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
@@ -380,13 +381,10 @@ export const getGlobalRecurringTasks = async (projectIds: string[]): Promise<Rec
   return allTasks;
 };
 
-// 11. Deactivate (Soft Delete) a Recurring Task
-export const deactivateRecurringTask = async (id: string): Promise<void> => {
+// 11. Delete a Recurring Task (Physical Deletion)
+export const deleteRecurringTask = async (id: string): Promise<void> => {
   const taskRef = doc(db, 'recurring_tasks', id);
-  await updateDoc(taskRef, {
-    isActive: false,
-    updatedAt: serverTimestamp()
-  });
+  await deleteDoc(taskRef);
 };
 
 import { addDays, setDate, addMonths, isAfter, getDay, startOfDay, format, addYears, setMonth, setYear, nextDay, startOfMonth, lastDayOfMonth } from 'date-fns';
