@@ -131,6 +131,7 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
   const nextDatePreview1 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig());
   const finalFirstDate = startDate || nextDatePreview1;
   const nextDatePreview2 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), finalFirstDate);
+  const nextDatePreview3 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), nextDatePreview2);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -348,13 +349,18 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
               <div style={{ marginTop: 'var(--spacing-md)' }}>
                 <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Fecha de Inicio de Recurrencia (Opcional)</label>
                 <p style={{ margin: 0, marginTop: '4px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Si se deja vacío, la primera tarea se programará automáticamente para: <strong style={{ color: 'var(--success-color)' }}>{nextDatePreview1}</strong>
+                  Puedes elegir explícitamente cuándo quieres que inicie el ciclo de repetición.
                 </p>
-                <input type="date" className="input" value={startDate} min={todayStr} onChange={e => setStartDate(e.target.value)} style={{ marginTop: '8px' }} />
+                <input type="date" className="input" value={startDate} min={todayStr} onChange={e => setStartDate(e.target.value)} style={{ marginTop: '8px', marginBottom: '12px' }} />
                 
-                <p style={{ margin: 0, marginTop: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Siguiente fecha después de la inicial: {nextDatePreview2}
-                </p>
+                <div style={{ padding: '12px', backgroundColor: 'var(--background-color)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-color)' }}>Previsualización de la agenda:</p>
+                  <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    <li><strong style={{ color: 'var(--success-color)' }}>1ª Ejecución:</strong> {finalFirstDate} {startDate ? '(Manual)' : '(Automática)'}</li>
+                    <li><strong>2ª Ejecución:</strong> {nextDatePreview2}</li>
+                    <li><strong>3ª Ejecución:</strong> {nextDatePreview3}</li>
+                  </ul>
+                </div>
               </div>
 
               <hr style={{ margin: 'var(--spacing-md) 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
