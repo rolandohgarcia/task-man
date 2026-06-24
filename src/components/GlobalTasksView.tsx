@@ -301,7 +301,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: '40px', height: '40px', borderRadius: '50%', border: 'none', cursor: 'pointer',
               backgroundColor: activeTab === 'mine' ? 'var(--primary-color)' : 'transparent', 
-              color: activeTab === 'mine' ? 'white' : 'var(--text-muted)',
+              color: activeTab === 'mine' ? 'var(--primary-text)' : 'var(--text-muted)',
               transition: 'all 0.2s'
             }}
           >
@@ -314,7 +314,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: '40px', height: '40px', borderRadius: '50%', border: 'none', cursor: 'pointer',
               backgroundColor: activeTab === 'supervised' ? 'var(--primary-color)' : 'transparent', 
-              color: activeTab === 'supervised' ? 'white' : 'var(--text-muted)',
+              color: activeTab === 'supervised' ? 'var(--primary-text)' : 'var(--text-muted)',
               transition: 'all 0.2s'
             }}
           >
@@ -327,7 +327,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: '40px', height: '40px', borderRadius: '50%', border: 'none', cursor: 'pointer',
               backgroundColor: activeTab === 'recurring' ? 'var(--primary-color)' : 'transparent', 
-              color: activeTab === 'recurring' ? 'white' : 'var(--text-muted)',
+              color: activeTab === 'recurring' ? 'var(--primary-text)' : 'var(--text-muted)',
               transition: 'all 0.2s'
             }}
           >
