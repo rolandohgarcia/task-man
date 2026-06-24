@@ -7,6 +7,8 @@ import { getUserCompanies } from '../services/companyService';
 import type { Company } from '../services/companyService';
 import { getUserProjects } from '../services/projectService';
 import type { Project } from '../services/projectService';
+import { getUsersByIds } from '../services/userService';
+import type { UserProfile } from '../services/userService';
 import type { User } from 'firebase/auth';
 import TaskForm from './TaskForm';
 import RecurringTaskForm from './RecurringTaskForm';
@@ -41,6 +43,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
   const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>([]);
   const [projectsMap, setProjectsMap] = useState<Record<string, Project>>({});
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string, UserProfile>>({});
   
   const [loading, setLoading] = useState(true);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -101,7 +104,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
           });
         }
       } catch (error) {
-        console.error(error);
+        console.error("Error loading global tasks data:", error);
       } finally {
         setLoading(false);
       }
@@ -114,7 +117,31 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
       if (unsubSupervised) unsubSupervised();
       if (unsubRecurring) unsubRecurring();
     };
-  }, [user]);
+  }, [user.uid]);
+
+  // Fetch users when tasks change
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const userIds = new Set<string>();
+      const addIds = (tasks: Task[]) => {
+        tasks.forEach(t => {
+          if (t.createdBy) userIds.add(t.createdBy);
+          if (t.assignedUserIds) t.assignedUserIds.forEach(id => userIds.add(id));
+        });
+      };
+      
+      addIds(myTasks);
+      addIds(supervisedTasks);
+      
+      if (userIds.size > 0) {
+        const users = await getUsersByIds(Array.from(userIds));
+        const map: Record<string, UserProfile> = {};
+        users.forEach(u => map[u.id] = u);
+        setUsersMap(map);
+      }
+    };
+    fetchUsers();
+  }, [myTasks, supervisedTasks]);
 
   // Process lists based on the active tab
   let displayedTasks: Task[] = [];
@@ -279,6 +306,44 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
         <p style={{ fontSize: '0.9rem', color: 'var(--text-color)', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {task.description || 'Sin descripción'}
         </p>
+
+        {/* Footer info: Creator, Date and Assigned Users */}
+        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {task.createdBy && (
+              <span style={{ display: 'block', marginBottom: '4px' }}>
+                Creado por: <strong>{usersMap[task.createdBy]?.displayName || 'Desconocido'}</strong>
+              </span>
+            )}
+            {task.createdAt && (
+              <span style={{ display: 'block' }}>
+                Fecha: {new Date(task.createdAt?.toDate ? task.createdAt.toDate() : task.createdAt).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+          
+          {task.assignedUserIds && task.assignedUserIds.length > 0 && (
+            <div className="flex-row" style={{ gap: '4px' }}>
+              {task.assignedUserIds.map(uid => {
+                const member = usersMap[uid];
+                return (
+                  <div 
+                    key={uid} 
+                    title={member?.displayName || 'Desconocido'} 
+                    style={{ 
+                      width: '24px', height: '24px', borderRadius: '50%', 
+                      backgroundColor: 'var(--border-color)', display: 'flex', 
+                      alignItems: 'center', justifyContent: 'center', 
+                      fontSize: '0.7rem' 
+                    }}
+                  >
+                    {member?.emoji || (member?.displayName ? member.displayName.charAt(0).toUpperCase() : '?')}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     );
   };

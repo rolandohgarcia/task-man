@@ -193,12 +193,55 @@ const ProjectView = ({ user }: ProjectViewProps) => {
             <div className="flex-col">
               {tasks.map(task => (
                 <div key={task.id} className="card flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div className="flex-col" style={{ gap: 'var(--spacing-xs)' }}>
+                  <div className="flex-col" style={{ gap: 'var(--spacing-xs)', flex: 1 }}>
                     <h3 style={{ margin: 0 }}>{task.title}</h3>
-                    <span style={{ fontWeight: 'bold', color: getPriorityColor(task.priority) }}>
-                      Prioridad: {task.priority}
-                    </span>
-                    <span style={{ color: 'var(--text-muted)' }}>Progreso: {task.progress}%</span>
+                    <div className="flex-row" style={{ gap: '8px', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                      <span style={{ fontWeight: 'bold', color: getPriorityColor(task.priority) }}>
+                        Prioridad: {task.priority}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>|</span>
+                      <span style={{ color: 'var(--text-muted)' }}>Progreso: {task.progress}%</span>
+                      
+                      {task.createdAt && (
+                        <>
+                          <span style={{ color: 'var(--text-muted)' }}>|</span>
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            Creada: {new Date(task.createdAt?.toDate ? task.createdAt.toDate() : task.createdAt).toLocaleDateString()}
+                          </span>
+                        </>
+                      )}
+                      
+                      {task.createdBy && (
+                        <>
+                          <span style={{ color: 'var(--text-muted)' }}>|</span>
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            Por: {usersMap[task.createdBy]?.displayName || 'Desconocido'}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    
+                    {task.assignedUserIds && task.assignedUserIds.length > 0 && (
+                      <div className="flex-row" style={{ gap: '4px', marginTop: '4px' }}>
+                        {task.assignedUserIds.map(uid => {
+                          const member = usersMap[uid];
+                          return (
+                            <div 
+                              key={uid} 
+                              title={member?.displayName || 'Desconocido'} 
+                              style={{ 
+                                width: '20px', height: '20px', borderRadius: '50%', 
+                                backgroundColor: 'var(--border-color)', display: 'flex', 
+                                alignItems: 'center', justifyContent: 'center', 
+                                fontSize: '0.6rem' 
+                              }}
+                            >
+                              {member?.emoji || (member?.displayName ? member.displayName.charAt(0).toUpperCase() : '?')}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                     
                     <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden', marginTop: '4px' }}>
                       <div style={{ height: '100%', width: `${task.progress}%`, backgroundColor: task.progress === 100 ? 'var(--success-color)' : 'var(--primary-color)' }}></div>

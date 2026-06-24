@@ -23,6 +23,7 @@ export interface Task {
   description: string;
   priority: 'Critica' | 'Alta' | 'Media' | 'Baja';
   deadline: string;
+  createdBy?: string;
   assignedUserIds: string[];
   assignedTeamIds: string[];
   progress: number;

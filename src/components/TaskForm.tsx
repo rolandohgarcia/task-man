@@ -136,6 +136,7 @@ const TaskForm = ({ user, projectId, onClose, onTaskCreated }: TaskFormProps) =>
         description,
         priority,
         deadline,
+        createdBy: user.uid,
         assignedUserIds: selectedUserIds,
         assignedTeamIds: [], // Not used yet
         requiresEvidence,
