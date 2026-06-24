@@ -121,7 +121,7 @@ exports.generateScheduledTasks = functions.pubsub.schedule('0 1 * * *').timeZone
       const newTaskRef = db.collection('tasks').doc();
       
       // Calculate Deadline based on DurationDays
-      const durationDays = template.durationDays || 1;
+      const durationDays = template.durationDays !== undefined ? template.durationDays : 1;
       const deadlineDate = addDays(today, durationDays);
       const deadlineStr = format(deadlineDate, 'yyyy-MM-dd');
 

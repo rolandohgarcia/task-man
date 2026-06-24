@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, CheckCircle, Clock, Filter, AlertCircle, CalendarDays, Repeat, Trash2, ClipboardList, Eye, Building2, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
+import { Plus, CheckCircle, Clock, Filter, AlertCircle, CalendarDays, Repeat, Trash2, ClipboardList, Eye, Building2, ChevronLeft, ChevronRight, Edit2, CalendarOff, Flame, AlertTriangle, ArrowDown, Check, Square } from 'lucide-react';
 import { subscribeToGlobalUserTasks, subscribeToGlobalSupervisedTasks, subscribeToGlobalRecurringTasks, deleteRecurringTask } from '../services/taskService';
 import type { Task, RecurringTask } from '../services/taskService';
 import { getUserCompanies } from '../services/companyService';
+import { groupTasksByDate } from '../utils/taskGrouping';
 import type { Company } from '../services/companyService';
 import { getUserProjects } from '../services/projectService';
 import type { Project } from '../services/projectService';
@@ -253,7 +254,8 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
   const renderTaskCard = (task: Task) => {
     const project = projectsMap[task.projectId];
     const pColor = project?.color || 'var(--primary-color)';
-    const isOverdue = !task.isComplete && new Date(task.deadline).getTime() < new Date().getTime();
+    const isOverdue = !task.isComplete && task.deadline < format(new Date(), 'yyyy-MM-dd');
+    const borderColor = isOverdue ? 'var(--danger-color)' : pColor;
 
     return (
       <div 
@@ -262,8 +264,9 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
         onClick={() => navigate(`/company/${project?.companyId || 'unknown'}/project/${task.projectId}/task/${task.id}`)}
         style={{ 
           cursor: 'pointer', 
-          borderLeft: `18px solid ${pColor}`,
-          borderColor: pColor,
+          borderLeft: isOverdue ? `22px solid ${borderColor}` : `18px solid ${borderColor}`,
+          borderColor: borderColor,
+          backgroundColor: isOverdue ? 'rgba(204, 0, 0, 0.03)' : 'var(--surface-color)',
           position: 'relative',
           paddingLeft: 'var(--spacing-md)'
         }}
@@ -288,20 +291,21 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
             </div>
           </div>
 
-          {/* Priority Pill */}
-          {task.priority === 'Critica' && (
-            <span style={{ color: 'var(--danger-color)', display: 'flex', alignItems: 'center', fontSize: '0.8rem', fontWeight: 'bold' }}>
-              <AlertCircle size={14} style={{ marginRight: '4px' }}/> Crítica
-            </span>
-          )}
+          {/* Priority Icon */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={`Prioridad ${task.priority}`}>
+            {task.priority === 'Baja' && <ArrowDown size={22} strokeWidth={2.5} style={{ color: 'var(--primary-color)' }} />}
+            {task.priority === 'Media' && <Square size={22} strokeWidth={2.5} style={{ color: 'var(--success-color)' }} />}
+            {task.priority === 'Alta' && <AlertTriangle size={22} strokeWidth={2.5} style={{ color: 'var(--warning-color, #eab308)' }} />}
+            {task.priority === 'Critica' && <AlertCircle size={22} strokeWidth={2.5} style={{ color: 'var(--danger-color)' }} />}
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px' }}>
           {/* Left side: Title, Project, Description */}
           <div style={{ flex: 1, paddingRight: '12px' }}>
-            <h3 style={{ margin: '0 0 4px 0', color: isOverdue ? 'var(--danger-color)' : 'var(--text-color)' }}>
-              {isOverdue && <Clock size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }}/>}
+            <h3 style={{ margin: '0 0 4px 0', color: isOverdue ? 'var(--danger-color)' : 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               {task.title}
+              {isOverdue && <span style={{ backgroundColor: 'var(--danger-color)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={10} /> Atrasada</span>}
             </h3>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>
               {project?.name || 'Proyecto Desconocido'}
@@ -409,8 +413,8 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
             style={{ 
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: '40px', height: '40px', borderRadius: '50%', border: 'none', cursor: 'pointer',
-              backgroundColor: activeTab === 'calendar' ? 'var(--success-color)' : 'transparent', 
-              color: activeTab === 'calendar' ? 'white' : 'var(--text-muted)',
+              backgroundColor: activeTab === 'calendar' ? 'var(--primary-color)' : 'transparent', 
+              color: activeTab === 'calendar' ? 'var(--primary-text)' : 'var(--text-muted)',
               transition: 'all 0.2s'
             }}
           >
@@ -458,7 +462,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
       {/* Task List Content */}
       {activeTab === 'calendar' ? (
         calendarView === 'month' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 110px)', backgroundColor: 'var(--surface-color)', width: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(98dvh - 110px)', backgroundColor: 'var(--surface-color)', width: '100%' }}>
             <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
               
               {/* Custom Calendar Header */}
@@ -594,10 +598,15 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
             ) : (
               filteredRecurringTasks.map(task => {
                 const projectColor = projectsMap[task.projectId]?.color || 'var(--primary-color)';
+                const isOverdue = task.nextScheduledDate && task.nextScheduledDate < format(new Date(), 'yyyy-MM-dd');
+                
                 return (
                   <div key={task.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderColor: projectColor, borderLeftWidth: '18px', borderLeftColor: projectColor }}>
-                    <div style={{ flex: 1, paddingRight: 'var(--spacing-md)' }}>
-                      <h3 style={{ margin: 0, fontSize: '1.2rem', marginBottom: '4px' }}>{task.title}</h3>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ margin: 0, fontSize: '1.2rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {task.title}
+                        {isOverdue && <span style={{ backgroundColor: 'var(--danger-color)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={10} /> Atrasada</span>}
+                      </h3>
                       <p style={{ margin: 0, fontSize: '0.9rem', color: projectColor, fontWeight: 'bold' }}>
                         {projectsMap[task.projectId]?.name || 'Proyecto Desconocido'}
                       </p>
@@ -605,9 +614,11 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', backgroundColor: 'var(--surface-color)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
                           <Repeat size={14} /> {getRecurrenceText(task)}
                         </div>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', backgroundColor: 'var(--surface-color)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                          <CalendarDays size={14} /> Próxima: {task.nextScheduledDate}
-                        </div>
+                        {task.nextScheduledDate && (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', backgroundColor: 'var(--surface-color)', padding: '4px 8px', borderRadius: '4px', border: isOverdue ? '1px solid var(--danger-color)' : '1px solid var(--border-color)', color: isOverdue ? 'var(--danger-color)' : 'inherit', fontWeight: isOverdue ? 'bold' : 'normal' }}>
+                            <CalendarDays size={14} /> Próxima: {formatDate(task.nextScheduledDate)}
+                          </div>
+                        )}
                       </div>
                       {task.endDate && (
                         <p style={{ margin: 0, marginTop: '8px', fontSize: '0.8rem', color: 'var(--danger-color)' }}>
@@ -637,7 +648,35 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
             )}
           </div>
         ) : (
-          filteredTasks.map(task => renderTaskCard(task))
+          <div className="flex-col">
+            {groupTasksByDate(filteredTasks).map(group => (
+              <div key={group.id} style={{ marginBottom: 0 }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '16px', 
+                  marginTop: 0,
+                  marginBottom: 'var(--spacing-md)',
+                  marginLeft: 'calc(50% - 47.5vw)',
+                  marginRight: 'calc(50% - 47.5vw)',
+                  width: '95vw',
+                  color: group.id === 'overdue' ? 'var(--danger-color)' : 'var(--text-muted)',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  fontSize: '0.85rem',
+                  letterSpacing: '1px'
+                }}>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: group.id === 'overdue' ? 'var(--danger-color)' : 'var(--border-color)' }} />
+                  <span style={{ whiteSpace: 'nowrap' }}>{group.title} ({group.tasks.length})</span>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: group.id === 'overdue' ? 'var(--danger-color)' : 'var(--border-color)' }} />
+                </div>
+                
+                <div className="flex-col">
+                  {group.tasks.map(task => renderTaskCard(task))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
       )}

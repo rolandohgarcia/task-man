@@ -8,9 +8,10 @@ import type { Project } from '../services/projectService';
 import { getCompanyById } from '../services/companyService';
 import { getUsersByIds } from '../services/userService';
 import type { UserProfile } from '../services/userService';
+import { groupTasksByDate } from '../utils/taskGrouping';
 import TaskForm from './TaskForm';
 import RecurringTasksView from './RecurringTasksView';
-import { ClipboardList, Plus, ArrowLeft, Users, UserPlus, X, Trash2, CalendarDays } from 'lucide-react';
+import { ClipboardList, Plus, ArrowLeft, Users, UserPlus, X, Trash2, CalendarDays, AlertTriangle, AlertCircle, ArrowDown, Check, Square } from 'lucide-react';
 
 interface ProjectViewProps {
   user: User;
@@ -197,69 +198,112 @@ const ProjectView = ({ user }: ProjectViewProps) => {
             <p style={{ color: 'var(--text-muted)' }}>No hay tareas en este proyecto.</p>
           ) : (
             <div className="flex-col">
-              {tasks.map(task => (
-                <div key={task.id} className="card flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div className="flex-col" style={{ gap: 'var(--spacing-xs)', flex: 1 }}>
-                    <h3 style={{ margin: 0 }}>{task.title}</h3>
-                    <div className="flex-row" style={{ gap: '8px', flexWrap: 'wrap', fontSize: '0.8rem' }}>
-                      <span style={{ fontWeight: 'bold', color: getPriorityColor(task.priority) }}>
-                        Prioridad: {task.priority}
-                      </span>
-                      <span style={{ color: 'var(--text-muted)' }}>|</span>
-                      <span style={{ color: 'var(--text-muted)' }}>Progreso: {task.progress}%</span>
-                      
-                      {task.createdAt && (
-                        <>
-                          <span style={{ color: 'var(--text-muted)' }}>|</span>
-                          <span style={{ color: 'var(--text-muted)' }}>
-                            Creada: {new Date(task.createdAt?.toDate ? task.createdAt.toDate() : task.createdAt).toLocaleDateString()}
-                          </span>
-                        </>
-                      )}
-                      
-                      {task.createdBy && (
-                        <>
-                          <span style={{ color: 'var(--text-muted)' }}>|</span>
-                          <span style={{ color: 'var(--text-muted)' }}>
-                            Por: {usersMap[task.createdBy]?.displayName || 'Desconocido'}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    
-                    {task.assignedUserIds && task.assignedUserIds.length > 0 && (
-                      <div className="flex-row" style={{ gap: '4px', marginTop: '4px' }}>
-                        {task.assignedUserIds.map(uid => {
-                          const member = usersMap[uid];
-                          return (
-                            <div 
-                              key={uid} 
-                              title={member?.displayName || 'Desconocido'} 
-                              style={{ 
-                                width: '20px', height: '20px', borderRadius: '50%', 
-                                backgroundColor: 'var(--border-color)', display: 'flex', 
-                                alignItems: 'center', justifyContent: 'center', 
-                                fontSize: '0.6rem' 
-                              }}
-                            >
-                              {member?.emoji || (member?.displayName ? member.displayName.charAt(0).toUpperCase() : '?')}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    
-                    <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden', marginTop: '4px' }}>
-                      <div style={{ height: '100%', width: `${task.progress}%`, backgroundColor: task.progress === 100 ? 'var(--success-color)' : 'var(--primary-color)' }}></div>
-                    </div>
+              {groupTasksByDate(tasks).map(group => (
+                <div key={group.id} style={{ marginBottom: 0 }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '16px', 
+                    marginTop: 0,
+                    marginBottom: 'var(--spacing-md)',
+                    marginLeft: 'calc(50% - 47.5vw)',
+                    marginRight: 'calc(50% - 47.5vw)',
+                    width: '95vw',
+                    color: group.id === 'overdue' ? 'var(--danger-color)' : 'var(--text-muted)',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    fontSize: '0.85rem',
+                    letterSpacing: '1px'
+                  }}>
+                    <div style={{ flex: 1, height: '1px', backgroundColor: group.id === 'overdue' ? 'var(--danger-color)' : 'var(--border-color)' }} />
+                    <span style={{ whiteSpace: 'nowrap' }}>{group.title} ({group.tasks.length})</span>
+                    <div style={{ flex: 1, height: '1px', backgroundColor: group.id === 'overdue' ? 'var(--danger-color)' : 'var(--border-color)' }} />
                   </div>
-                  <button 
-                    onClick={() => navigate(`/company/${companyId}/project/${projectId}/task/${task.id}`)} 
-                    className="btn" 
-                    style={{ width: 'auto', minHeight: '40px' }}
-                  >
-                    Abrir
-                  </button>
+                  
+                  <div className="flex-col">
+                    {group.tasks.map(task => {
+                      const isOverdue = !task.isComplete && task.deadline && task.deadline < new Date().toISOString().split('T')[0];
+                      const borderColor = isOverdue ? 'var(--danger-color)' : 'var(--primary-color)';
+                      
+                      return (
+                        <div key={task.id} className="card flex-row" style={{ justifyContent: 'space-between', alignItems: 'center', borderColor: borderColor, borderLeftWidth: isOverdue ? '22px' : '18px', borderLeftColor: borderColor, backgroundColor: isOverdue ? 'rgba(204, 0, 0, 0.03)' : 'var(--surface-color)' }}>
+                          <div className="flex-col" style={{ gap: 'var(--spacing-xs)', flex: 1 }}>
+                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {task.title}
+                              {isOverdue && <span style={{ backgroundColor: 'var(--danger-color)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Atrasada</span>}
+                            </h3>
+                            <div className="flex-row" style={{ gap: '8px', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                              <span style={{ fontWeight: 'bold', color: getPriorityColor(task.priority) }}>
+                                Prioridad: {task.priority}
+                              </span>
+                              <span style={{ color: 'var(--text-muted)' }}>|</span>
+                              <span style={{ color: 'var(--text-muted)' }}>Progreso: {task.progress}%</span>
+                              
+                              {task.deadline && (
+                                <>
+                                  <span style={{ color: 'var(--text-muted)' }}>|</span>
+                                  <span style={{ color: isOverdue ? 'var(--danger-color)' : 'var(--text-muted)', fontWeight: isOverdue ? 'bold' : 'normal' }}>
+                                    Límite: {task.deadline}
+                                  </span>
+                                </>
+                              )}
+                              
+                              {task.createdBy && (
+                                <>
+                                  <span style={{ color: 'var(--text-muted)' }}>|</span>
+                                  <span style={{ color: 'var(--text-muted)' }}>
+                                    Por: {usersMap[task.createdBy]?.displayName || 'Desconocido'}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                            
+                            {task.assignedUserIds && task.assignedUserIds.length > 0 && (
+                              <div className="flex-row" style={{ gap: '4px', marginTop: '4px' }}>
+                                {task.assignedUserIds.map(uid => {
+                                  const member = usersMap[uid];
+                                  return (
+                                    <div 
+                                      key={uid} 
+                                      title={member?.displayName || 'Desconocido'} 
+                                      style={{ 
+                                        width: '20px', height: '20px', borderRadius: '50%', 
+                                        backgroundColor: 'var(--border-color)', display: 'flex', 
+                                        alignItems: 'center', justifyContent: 'center', 
+                                        fontSize: '0.6rem' 
+                                      }}
+                                    >
+                                      {member?.emoji || (member?.displayName ? member.displayName.charAt(0).toUpperCase() : '?')}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden', marginTop: '4px' }}>
+                              <div style={{ height: '100%', width: `${task.progress}%`, backgroundColor: task.progress === 100 ? 'var(--success-color)' : 'var(--primary-color)' }}></div>
+                            </div>
+                          </div>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={`Prioridad ${task.priority}`}>
+                              {task.priority === 'Baja' && <ArrowDown size={22} strokeWidth={2.5} style={{ color: 'var(--primary-color)' }} />}
+                              {task.priority === 'Media' && <Square size={22} strokeWidth={2.5} style={{ color: 'var(--success-color)' }} />}
+                              {task.priority === 'Alta' && <AlertTriangle size={22} strokeWidth={2.5} style={{ color: 'var(--warning-color, #eab308)' }} />}
+                              {task.priority === 'Critica' && <AlertCircle size={22} strokeWidth={2.5} style={{ color: 'var(--danger-color)' }} />}
+                            </div>
+                            
+                            <button 
+                              onClick={() => navigate(`/company/${companyId}/project/${projectId}/task/${task.id}`)} 
+                              className="btn" 
+                              style={{ width: 'auto', minHeight: '40px' }}
+                            >
+                              Abrir
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ))}
             </div>

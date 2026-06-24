@@ -37,7 +37,7 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, editTask,
   const [title, setTitle] = useState(editTask?.title || '');
   const [description, setDescription] = useState(editTask?.description || '');
   const [priority, setPriority] = useState<'Baja' | 'Media' | 'Alta' | 'Urgente'>(editTask?.priority || 'Media');
-  const [durationDays, setDurationDays] = useState(editTask?.durationDays || 1);
+  const [durationDays, setDurationDays] = useState(editTask?.durationDays !== undefined ? editTask.durationDays : 1);
   const [endDate, setEndDate] = useState(editTask?.endDate || '');
   
   const [assignedUserIds, setAssignedUserIds] = useState<string[]>(editTask?.assignedUserIds || []);
@@ -446,7 +446,7 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, editTask,
 
               <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Tiempo para completar (Días)*</label>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Se sumará a la fecha de creación para calcular la Fecha Límite.</p>
-              <input type="number" min="1" className="input" value={durationDays} onChange={e => setDurationDays(parseInt(e.target.value))} required />
+              <input type="number" min="0" className="input" value={durationDays} onChange={e => setDurationDays(parseInt(e.target.value))} required />
 
               <label style={{ fontSize: '0.9rem', fontWeight: 'bold', marginTop: 'var(--spacing-md)' }}>Fecha de Terminación (Opcional)</label>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Si se deja vacío, la tarea se repetirá indefinidamente hasta que se borre.</p>
