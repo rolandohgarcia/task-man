@@ -4,7 +4,7 @@ import type { RecurringTask } from '../services/taskService';
 import { getProjectById } from '../services/projectService';
 import type { Project } from '../services/projectService';
 import type { User } from 'firebase/auth';
-import { Repeat, Trash2, Calendar, Plus } from 'lucide-react';
+import { Repeat, Trash2, Calendar, Plus, Edit2 } from 'lucide-react';
 import RecurringTaskForm from './RecurringTaskForm';
 
 interface RecurringTasksViewProps {
@@ -18,6 +18,7 @@ const RecurringTasksView = ({ user, companyId, projectId }: RecurringTasksViewPr
   const [projectsMap, setProjectsMap] = useState<Record<string, Project>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingTask, setEditingTask] = useState<RecurringTask | undefined>();
 
   const loadData = async () => {
     if (!companyId) return;
@@ -92,12 +93,14 @@ const RecurringTasksView = ({ user, companyId, projectId }: RecurringTasksViewPr
         </div>
       ) : (
         <div className="flex-col">
-          {tasks.map(task => (
-            <div key={task.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderColor: 'var(--success-color)', borderLeftWidth: '6px', borderLeftColor: 'var(--success-color)' }}>
-              <div style={{ flex: 1, paddingRight: 'var(--spacing-md)' }}>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', marginBottom: '4px' }}>{task.title}</h3>
-                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
-                  {projectsMap[task.projectId]?.name || 'Proyecto Desconocido'}
+          {tasks.map(task => {
+            const projectColor = projectsMap[task.projectId]?.color || 'var(--primary-color)';
+            return (
+              <div key={task.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderColor: projectColor, borderLeftWidth: '6px', borderLeftColor: projectColor }}>
+                <div style={{ flex: 1, paddingRight: 'var(--spacing-md)' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', marginBottom: '4px' }}>{task.title}</h3>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: projectColor, fontWeight: 'bold' }}>
+                    {projectsMap[task.projectId]?.name || 'Proyecto Desconocido'}
                 </p>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', backgroundColor: 'var(--surface-color)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
@@ -113,16 +116,25 @@ const RecurringTasksView = ({ user, companyId, projectId }: RecurringTasksViewPr
                   </p>
                 )}
               </div>
-              
-              <button 
-                onClick={() => handleDelete(task.id, task.title)}
-                style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', padding: '8px', backgroundColor: 'rgba(204, 0, 0, 0.1)', borderRadius: '50%' }}
-                title="Eliminar plantilla"
-              >
-                <Trash2 size={20} />
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  onClick={() => { setEditingTask(task); setShowForm(true); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', padding: '8px', backgroundColor: 'rgba(0, 102, 204, 0.1)', borderRadius: '50%' }}
+                  title="Editar plantilla"
+                >
+                  <Edit2 size={20} />
+                </button>
+                <button 
+                  onClick={() => handleDelete(task.id, task.title)}
+                  style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', padding: '8px', backgroundColor: 'rgba(204, 0, 0, 0.1)', borderRadius: '50%' }}
+                  title="Eliminar plantilla"
+                >
+                  <Trash2 size={20} />
+                </button>
+              </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -138,8 +150,9 @@ const RecurringTasksView = ({ user, companyId, projectId }: RecurringTasksViewPr
           user={user} 
           defaultCompanyId={companyId}
           defaultProjectId={projectId}
-          onClose={() => setShowForm(false)} 
-          onTaskCreated={loadData}
+          editTask={editingTask}
+          onClose={() => { setShowForm(false); setEditingTask(undefined); }} 
+          onTaskCreated={() => { setShowForm(false); setEditingTask(undefined); loadData(); }}
         />
       )}
     </div>

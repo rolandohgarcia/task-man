@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, CheckCircle, Clock, Filter, AlertCircle, CalendarDays, Repeat, Trash2, ClipboardList, Eye, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, CheckCircle, Clock, Filter, AlertCircle, CalendarDays, Repeat, Trash2, ClipboardList, Eye, Building2, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
 import { subscribeToGlobalUserTasks, subscribeToGlobalSupervisedTasks, subscribeToGlobalRecurringTasks, deleteRecurringTask } from '../services/taskService';
 import type { Task, RecurringTask } from '../services/taskService';
 import { getUserCompanies } from '../services/companyService';
@@ -48,6 +48,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
   const [loading, setLoading] = useState(true);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showRecurringForm, setShowRecurringForm] = useState(false);
+  const [editingTask, setEditingTask] = useState<RecurringTask | undefined>();
   const [filterComplete, setFilterComplete] = useState<'all' | 'pending' | 'completed'>(() => {
     return (localStorage.getItem('globalFilterComplete') as any) || 'pending';
   });
@@ -591,37 +592,48 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
                 <p style={{ color: 'var(--text-muted)' }}>No hay tareas recurrentes para mostrar.</p>
               </div>
             ) : (
-              filteredRecurringTasks.map(task => (
-                <div key={task.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderColor: 'var(--success-color)', borderLeftWidth: '18px', borderLeftColor: 'var(--success-color)' }}>
-                  <div style={{ flex: 1, paddingRight: 'var(--spacing-md)' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', marginBottom: '4px' }}>{task.title}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
-                      {projectsMap[task.projectId]?.name || 'Proyecto Desconocido'}
-                    </p>
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '12px', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', backgroundColor: 'var(--surface-color)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                        <Repeat size={14} /> {getRecurrenceText(task)}
-                      </div>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', backgroundColor: 'var(--surface-color)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                        <CalendarDays size={14} /> Próxima: {task.nextScheduledDate}
-                      </div>
-                    </div>
-                    {task.endDate && (
-                      <p style={{ margin: 0, marginTop: '8px', fontSize: '0.8rem', color: 'var(--danger-color)' }}>
-                        Termina el: {task.endDate}
+              filteredRecurringTasks.map(task => {
+                const projectColor = projectsMap[task.projectId]?.color || 'var(--primary-color)';
+                return (
+                  <div key={task.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderColor: projectColor, borderLeftWidth: '18px', borderLeftColor: projectColor }}>
+                    <div style={{ flex: 1, paddingRight: 'var(--spacing-md)' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.2rem', marginBottom: '4px' }}>{task.title}</h3>
+                      <p style={{ margin: 0, fontSize: '0.9rem', color: projectColor, fontWeight: 'bold' }}>
+                        {projectsMap[task.projectId]?.name || 'Proyecto Desconocido'}
                       </p>
-                    )}
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '12px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', backgroundColor: 'var(--surface-color)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                          <Repeat size={14} /> {getRecurrenceText(task)}
+                        </div>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', backgroundColor: 'var(--surface-color)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                          <CalendarDays size={14} /> Próxima: {task.nextScheduledDate}
+                        </div>
+                      </div>
+                      {task.endDate && (
+                        <p style={{ margin: 0, marginTop: '8px', fontSize: '0.8rem', color: 'var(--danger-color)' }}>
+                          Termina el: {task.endDate}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={() => { setEditingTask(task); setShowRecurringForm(true); }}
+                        style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', padding: '8px', backgroundColor: 'rgba(0, 102, 204, 0.1)', borderRadius: '50%' }}
+                        title="Editar plantilla"
+                      >
+                        <Edit2 size={20} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteRecurring(task.id, task.title)}
+                        style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', padding: '8px', backgroundColor: 'rgba(204, 0, 0, 0.1)', borderRadius: '50%' }}
+                        title="Eliminar plantilla"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
                   </div>
-                  
-                  <button 
-                    onClick={() => handleDeleteRecurring(task.id, task.title)}
-                    style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', padding: '8px', backgroundColor: 'rgba(204, 0, 0, 0.1)', borderRadius: '50%' }}
-                    title="Eliminar plantilla"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         ) : (
@@ -638,7 +650,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
       )}
       
       {activeTab === 'recurring' && !showRecurringForm && (
-        <button className="fab" onClick={() => setShowRecurringForm(true)}>
+        <button className="fab" onClick={() => { setEditingTask(undefined); setShowRecurringForm(true); }}>
           <Plus size={32} />
         </button>
       )}
@@ -648,15 +660,16 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
         <TaskForm 
           user={user} 
           onClose={() => setShowTaskForm(false)} 
-          onTaskCreated={() => {}} 
+          onTaskCreated={() => setShowTaskForm(false)} 
         />
       )}
 
       {showRecurringForm && (
         <RecurringTaskForm 
-          user={user} 
-          onClose={() => setShowRecurringForm(false)} 
-          onTaskCreated={() => {}} 
+          user={user}
+          editTask={editingTask}
+          onClose={() => { setShowRecurringForm(false); setEditingTask(undefined); }} 
+          onTaskCreated={() => { setShowRecurringForm(false); setEditingTask(undefined); }} 
         />
       )}
 

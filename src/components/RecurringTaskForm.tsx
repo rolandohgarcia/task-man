@@ -7,47 +7,53 @@ import { getUserCompanies } from '../services/companyService';
 import type { Company } from '../services/companyService';
 import { getUsersByIds } from '../services/userService';
 import type { UserProfile } from '../services/userService';
-import { createRecurringTask, calculateNextScheduledDate } from '../services/taskService';
+import { createRecurringTask, calculateNextScheduledDate, createTask, uploadReferenceImages, updateRecurringTask } from '../services/taskService';
 import type { RecurrenceType, RecurrenceConfig } from '../services/taskService';
-import { format } from 'date-fns';
+import { format, addDays, startOfDay } from 'date-fns';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+
+import type { RecurringTask } from '../services/taskService';
 
 interface RecurringTaskFormProps {
   user: User;
   defaultProjectId?: string;
   defaultCompanyId?: string;
+  editTask?: RecurringTask;
   onClose: () => void;
   onTaskCreated: () => void;
 }
 
-const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, onTaskCreated }: RecurringTaskFormProps) => {
+const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, editTask, onClose, onTaskCreated }: RecurringTaskFormProps) => {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [projectId, setProjectId] = useState(defaultProjectId || '');
+  const [projectId, setProjectId] = useState(editTask?.projectId || defaultProjectId || '');
   
   // Global creation support
   const [availableCompanies, setAvailableCompanies] = useState<Company[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState(defaultCompanyId || '');
+  const [selectedCompanyId, setSelectedCompanyId] = useState(editTask?.companyId || defaultCompanyId || '');
   const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<'Baja' | 'Media' | 'Alta' | 'Urgente'>('Media');
-  const [durationDays, setDurationDays] = useState(1);
-  const [endDate, setEndDate] = useState('');
+  const [title, setTitle] = useState(editTask?.title || '');
+  const [description, setDescription] = useState(editTask?.description || '');
+  const [priority, setPriority] = useState<'Baja' | 'Media' | 'Alta' | 'Urgente'>(editTask?.priority || 'Media');
+  const [durationDays, setDurationDays] = useState(editTask?.durationDays || 1);
+  const [endDate, setEndDate] = useState(editTask?.endDate || '');
   
-  const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
-  const [requiresEvidence, setRequiresEvidence] = useState(false);
+  const [assignedUserIds, setAssignedUserIds] = useState<string[]>(editTask?.assignedUserIds || []);
+  const [requiresEvidence, setRequiresEvidence] = useState(editTask?.requiresEvidence || false);
   const [photos, setPhotos] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
+  const [previews, setPreviews] = useState<string[]>(editTask?.referenceImages || []);
 
   // Recurrence state
-  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('daily_interval');
-  const [interval, setIntervalVal] = useState(1);
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([1]); // Default Lunes
-  const [dayOfMonth, setDayOfMonth] = useState(1);
-  const [targetDate, setTargetDate] = useState('');
-  const [weekOfMonth, setWeekOfMonth] = useState(1);
-  const [dayOfWeek, setDayOfWeek] = useState(1);
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>(editTask?.recurrenceType || 'daily_interval');
+  const [interval, setIntervalVal] = useState(editTask?.recurrenceConfig?.interval || 1);
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(editTask?.recurrenceConfig?.daysOfWeek || [1]);
+  const [dayOfMonth, setDayOfMonth] = useState(editTask?.recurrenceConfig?.dayOfMonth || 1);
+  const [targetDate, setTargetDate] = useState(editTask?.recurrenceConfig?.targetDate || '');
+  const [weekOfMonth, setWeekOfMonth] = useState(editTask?.recurrenceConfig?.weekOfMonth || 1);
+  const [dayOfWeek, setDayOfWeek] = useState(editTask?.recurrenceConfig?.dayOfWeek || 1);
+  // No se puede extraer startDate fácilmente de la fórmula inversa, así que se deja en blanco en modo edición
   const [startDate, setStartDate] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,7 +95,6 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
       } else {
         setFilteredProjects([]);
       }
-      setProjectId(''); // Reset project if company changes
     }
   }, [selectedCompanyId, availableProjects, defaultProjectId]);
 
@@ -132,7 +137,7 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
     if (recurrenceType === 'daily_interval' || recurrenceType === 'monthly_interval') {
       return startDate || todayStr;
     }
-    return calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), startDate || undefined);
+    return calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), startDate || undefined, true);
   };
 
   const nextDatePreview1 = getFirstScheduledDate();
@@ -174,23 +179,91 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
       }
 
       const config = getRecurrenceConfig();
-      const firstScheduledDate = getFirstScheduledDate();
+      
+      if (editTask) {
+        // Lógica de Edición
+        const nextDate = calculateNextScheduledDate(recurrenceType, config, todayStr);
+        await updateRecurringTask(editTask.id, {
+          projectId,
+          companyId: finalCompanyId,
+          title,
+          description,
+          priority,
+          durationDays,
+          assignedUserIds,
+          requiresEvidence,
+          recurrenceType,
+          recurrenceConfig: config,
+          endDate: endDate || null,
+          nextScheduledDate: nextDate
+        } as any);
 
-      await createRecurringTask({
-        projectId,
-        companyId: finalCompanyId,
-        title,
-        description,
-        priority,
-        durationDays,
-        assignedUserIds,
-        requiresEvidence,
-        recurrenceType,
-        recurrenceConfig: config,
-        nextScheduledDate: firstScheduledDate,
-        endDate: endDate || null,
-        isActive: true
-      } as any);
+        if (photos && photos.length > 0) {
+          const photoUrls = await uploadReferenceImages(editTask.id, photos);
+          await updateDoc(doc(db, 'recurring_tasks', editTask.id), { 
+            referenceImages: [...previews, ...photoUrls] 
+          });
+        }
+      } else {
+        // Lógica de Creación Original
+        const firstScheduledDate = getFirstScheduledDate();
+        
+        let nextScheduledDate = firstScheduledDate;
+        let immediateTaskCreated = false;
+        
+        // Si la fecha programada es hoy o ya pasó, adelantamos la plantilla
+        if (firstScheduledDate <= todayStr) {
+          nextScheduledDate = calculateNextScheduledDate(recurrenceType, config, firstScheduledDate);
+          immediateTaskCreated = true;
+        }
+
+        // 1. Guardamos la plantilla PRIMERO
+        const recurringTask = await createRecurringTask({
+          projectId,
+          companyId: finalCompanyId,
+          title,
+          description,
+          priority,
+          durationDays,
+          assignedUserIds,
+          requiresEvidence,
+          recurrenceType,
+          recurrenceConfig: config,
+          nextScheduledDate,
+          endDate: endDate || null,
+          isActive: true
+        } as any);
+
+        // 2. Subimos las fotos UNA SOLA VEZ y las atamos al ID de la plantilla
+        let photoUrls: string[] = [];
+        if (photos && photos.length > 0) {
+          photoUrls = await uploadReferenceImages(recurringTask.id, photos);
+          await updateDoc(doc(db, 'recurring_tasks', recurringTask.id), { referenceImages: photoUrls });
+        }
+
+        // 3. Creamos la tarea INMEDIATA (si aplica) reusando exactamente las mismas URLs
+        if (immediateTaskCreated) {
+          const taskDeadline = format(addDays(startOfDay(new Date()), durationDays), 'yyyy-MM-dd');
+          
+          await createTask({
+            projectId,
+            companyId: finalCompanyId,
+            title,
+            description,
+            priority,
+            deadline: taskDeadline,
+            requiresEvidence,
+            assignedUserIds,
+            referenceImages: photoUrls,
+            progress: 0,
+            isComplete: false,
+            isRecurring: true, 
+            createdBy: user.uid,
+            createdAt: new Date() as any,
+            updatedAt: new Date() as any
+          } as any);
+        }
+      }
 
       onTaskCreated();
       onClose();
@@ -213,12 +286,12 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-color)', cursor: 'pointer', marginRight: 'var(--spacing-md)' }}>
             <X size={28} />
           </button>
-          <h2 style={{ margin: 0, flex: 1 }}>Crear Tarea Recurrente</h2>
+          <h2 style={{ margin: 0, flex: 1 }}>{editTask ? 'Editar Tarea Recurrente' : 'Crear Tarea Recurrente'}</h2>
           <button 
             form="recurringTaskForm" type="submit" onClick={() => setWasValidated(true)}
             className="btn" disabled={isSubmitting} style={{ width: 'auto', padding: '8px 16px', minHeight: 'auto', backgroundColor: 'var(--primary-color)' }}
           >
-            {isSubmitting ? 'Guardando...' : 'Crear Tarea'}
+            {isSubmitting ? 'Guardando...' : editTask ? 'Guardar Cambios' : 'Crear Tarea'}
           </button>
         </div>
 
@@ -231,7 +304,7 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
               {!defaultProjectId && (
                 <>
                   <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Empresa*</label>
-                  <select className="input" value={selectedCompanyId} onChange={e => setSelectedCompanyId(e.target.value)} required>
+                  <select className="input" value={selectedCompanyId} onChange={e => { setSelectedCompanyId(e.target.value); setProjectId(''); setAssignedUserIds([]); }} required>
                     <option value="">Selecciona una empresa</option>
                     {availableCompanies.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>

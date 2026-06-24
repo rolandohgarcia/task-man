@@ -319,6 +319,15 @@ export const createRecurringTask = async (data: Omit<RecurringTask, 'id' | 'crea
   return newRecurringTask;
 };
 
+// 9b. Update a Recurring Task Template
+export const updateRecurringTask = async (id: string, data: Partial<Omit<RecurringTask, 'id' | 'createdAt' | 'updatedAt' | 'isActive'>>) => {
+  const recurringRef = doc(db, 'recurring_tasks', id);
+  await updateDoc(recurringRef, {
+    ...data,
+    updatedAt: serverTimestamp()
+  });
+};
+
 export const subscribeToGlobalRecurringTasks = (projectIds: string[], callback: (tasks: RecurringTask[]) => void) => {
   if (projectIds.length === 0) {
     callback([]);
@@ -389,7 +398,7 @@ export const deleteRecurringTask = async (id: string): Promise<void> => {
 
 import { addDays, setDate, addMonths, isAfter, getDay, startOfDay, format, addYears, setMonth, setYear, nextDay, startOfMonth, lastDayOfMonth } from 'date-fns';
 
-export const calculateNextScheduledDate = (type: RecurrenceType, config: RecurrenceConfig, fromDateStr?: string): string => {
+export const calculateNextScheduledDate = (type: RecurrenceType, config: RecurrenceConfig, fromDateStr?: string, inclusive: boolean = false): string => {
   const fromDate = fromDateStr ? startOfDay(new Date(fromDateStr + 'T00:00:00')) : startOfDay(new Date());
   
   if (type === 'daily_interval') {
@@ -406,7 +415,7 @@ export const calculateNextScheduledDate = (type: RecurrenceType, config: Recurre
     const targetDays = config.daysOfWeek || []; // 0=Sun, 1=Mon...
     if (targetDays.length === 0) return format(addDays(fromDate, 1), 'yyyy-MM-dd');
     
-    let nextDate = addDays(fromDate, 1);
+    let nextDate = inclusive ? fromDate : addDays(fromDate, 1);
     for (let i = 0; i < 8; i++) {
       if (targetDays.includes(getDay(nextDate))) {
         return format(nextDate, 'yyyy-MM-dd');
@@ -418,7 +427,8 @@ export const calculateNextScheduledDate = (type: RecurrenceType, config: Recurre
   if (type === 'monthly_date') {
     const targetDate = config.dayOfMonth || 1;
     let nextDate = setDate(fromDate, targetDate);
-    if (!isAfter(nextDate, fromDate)) {
+    const isValid = inclusive ? !isAfter(fromDate, nextDate) : isAfter(nextDate, fromDate);
+    if (!isValid) {
       nextDate = setDate(addMonths(fromDate, 1), targetDate);
     }
     return format(nextDate, 'yyyy-MM-dd');
@@ -431,7 +441,8 @@ export const calculateNextScheduledDate = (type: RecurrenceType, config: Recurre
     const targetDay = parseInt(parts[2], 10);
     
     let nextDate = setDate(setMonth(fromDate, targetMonth), targetDay);
-    if (!isAfter(nextDate, fromDate)) {
+    const isValid = inclusive ? !isAfter(fromDate, nextDate) : isAfter(nextDate, fromDate);
+    if (!isValid) {
       nextDate = addYears(nextDate, 1);
     }
     return format(nextDate, 'yyyy-MM-dd');
@@ -463,7 +474,8 @@ export const calculateNextScheduledDate = (type: RecurrenceType, config: Recurre
         targetDate = addDays(firstOcc, (week - 1) * 7);
       }
       
-      if (isAfter(targetDate, fromDate)) {
+      const isValid = inclusive ? !isAfter(fromDate, targetDate) : isAfter(targetDate, fromDate);
+      if (isValid) {
         return format(targetDate, 'yyyy-MM-dd');
       }
       // If we missed it this month, try next month

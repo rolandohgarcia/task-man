@@ -112,11 +112,8 @@ exports.generateScheduledTasks = functions.pubsub.schedule('0 1 * * *').timeZone
 
       // Check Expiration
       if (template.endDate && todayStr > template.endDate) {
-        console.log(`Plantilla ${docSnap.id} expiró. Desactivando...`);
-        batch.update(docSnap.ref, { 
-          isActive: false, 
-          updatedAt: admin.firestore.FieldValue.serverTimestamp() 
-        });
+        console.log(`Plantilla ${docSnap.id} expiró. Eliminando físicamente...`);
+        batch.delete(docSnap.ref);
         return;
       }
 
@@ -153,14 +150,12 @@ exports.generateScheduledTasks = functions.pubsub.schedule('0 1 * * *').timeZone
       const nextDateStr = calculateNextScheduledDate(template.recurrenceType, template.recurrenceConfig, todayStr);
 
       if (template.endDate && nextDateStr > template.endDate) {
-        batch.update(docSnap.ref, { 
-          isActive: false, 
-          updatedAt: admin.firestore.FieldValue.serverTimestamp() 
-        });
+        console.log(`Plantilla ${docSnap.id} completó su ciclo. Eliminando físicamente...`);
+        batch.delete(docSnap.ref);
       } else {
-        batch.update(docSnap.ref, {
+        batch.update(docSnap.ref, { 
           nextScheduledDate: nextDateStr,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          updatedAt: admin.firestore.FieldValue.serverTimestamp() 
         });
       }
     });
