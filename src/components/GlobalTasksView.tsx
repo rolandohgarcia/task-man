@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, CheckCircle, Clock, Filter, AlertCircle, CalendarDays, Repeat, Trash2, ClipboardList, Eye, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { subscribeToGlobalUserTasks, subscribeToGlobalSupervisedTasks, subscribeToGlobalRecurringTasks, deactivateRecurringTask } from '../services/taskService';
+import { subscribeToGlobalUserTasks, subscribeToGlobalSupervisedTasks, subscribeToGlobalRecurringTasks, deleteRecurringTask } from '../services/taskService';
 import type { Task, RecurringTask } from '../services/taskService';
 import { getUserCompanies } from '../services/companyService';
 import type { Company } from '../services/companyService';
@@ -230,8 +230,8 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
   };
 
   const handleDeleteRecurring = async (id: string, title: string) => {
-    if (window.confirm(`¿Estás seguro de que deseas eliminar la tarea recurrente "${title}"? Ya no se generarán más tareas automáticamente.`)) {
-      await deactivateRecurringTask(id);
+    if (window.confirm(`¿Estás seguro de que deseas eliminar permanentemente la plantilla recurrente "${title}"? Ya no se generarán más tareas automáticamente y no se puede deshacer.`)) {
+      await deleteRecurringTask(id);
       // No need to loadData(), onSnapshot will update the list
     }
   };
