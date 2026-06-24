@@ -83,58 +83,6 @@ export const requestNotificationPermission = async () => {
       console.log('[PUSH] SW Registrado y Activo:', registration.scope);
 
       console.log('[PUSH] Obteniendo token de FCM...');
-      
-      // --- DEBUG MASIVO ---
-      console.log('[PUSH] [DEBUG MASIVO] 1. Probando Firebase Installations...');
-      let debugFisToken = "";
-      try {
-        const { getInstallations, getToken: getInstallationsToken } = await import("firebase/installations");
-        const installations = getInstallations(app);
-        debugFisToken = await getInstallationsToken(installations);
-        console.log('[PUSH] [DEBUG MASIVO] 2. FIS Token:', debugFisToken ? debugFisToken.substring(0, 15) + '...' : 'VACÍO');
-      } catch (e) {
-        console.error('[PUSH] [DEBUG MASIVO] Error obteniendo FIS Token:', e);
-      }
-
-      console.log('[PUSH] [DEBUG MASIVO] 3. Probando petición RAW a fcmregistrations...');
-      try {
-        if (registration && debugFisToken) {
-          const sub = await registration.pushManager.getSubscription() || await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: vapidKey
-          });
-          
-          const p256dhBuffer = sub.getKey('p256dh') as ArrayBuffer;
-          const authBuffer = sub.getKey('auth') as ArrayBuffer;
-          
-          if (p256dhBuffer && authBuffer) {
-            const p256dh = btoa(String.fromCharCode.apply(null, new Uint8Array(p256dhBuffer) as unknown as number[])).replace(/\+/g, '-').replace(/\//g, '_');
-            const auth = btoa(String.fromCharCode.apply(null, new Uint8Array(authBuffer) as unknown as number[])).replace(/\+/g, '-').replace(/\//g, '_');
-            
-            const res = await fetch(`https://fcmregistrations.googleapis.com/v1/projects/${firebaseConfig.projectId}/registrations`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': firebaseConfig.apiKey || "",
-                'x-goog-firebase-installations-auth': debugFisToken,
-              },
-              body: JSON.stringify({
-                web: {
-                  endpoint: sub.endpoint,
-                  p256dh: p256dh,
-                  auth: auth
-                }
-              })
-            });
-            const body = await res.text();
-            console.log(`[PUSH] [DEBUG MASIVO RAW HTTP] Status: ${res.status} Body: ${body}`);
-          }
-        }
-      } catch (e) {
-        console.error('[PUSH] [DEBUG MASIVO] Error en petición RAW:', e);
-      }
-      // --------------------
-
       try {
         const currentToken = await getToken(messaging, { 
           vapidKey,
