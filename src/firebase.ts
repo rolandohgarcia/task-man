@@ -10,7 +10,7 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID, // Volvemos a usar la variable de entorno
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
@@ -97,22 +97,27 @@ export const requestNotificationPermission = async () => {
       } catch (err: any) {
         console.error('[PUSH] ERROR CRÍTICO obteniendo el token:', err);
         
-        // Auto-curación: Si el token falla por 401/Unauthorized (muy común si el AppID cambió y hay caché viejo en la PWA)
+        // Auto-curación: Si el token falla por 401/Unauthorized
         if (err.message && err.message.includes('authentication credential')) {
           console.log('[PUSH] AUTO-CURACIÓN: Detectado caché corrupto o AppID viejo. Limpiando datos de FCM locales...');
           try {
-            // 1. Desregistrar todos los Service Workers
-            const regs = await navigator.serviceWorker.getRegistrations();
-            for (let r of regs) {
-              await r.unregister();
+            if (!sessionStorage.getItem('fcm_healed')) {
+              sessionStorage.setItem('fcm_healed', 'true');
+              // 1. Desregistrar todos los Service Workers
+              const regs = await navigator.serviceWorker.getRegistrations();
+              for (let r of regs) {
+                await r.unregister();
+              }
+              // 2. Borrar las bases de datos de IndexedDB usadas por Firebase FCM e Installations
+              indexedDB.deleteDatabase('firebase-installations-database');
+              indexedDB.deleteDatabase('firebase-messaging-database');
+              indexedDB.deleteDatabase('fcm_token_details_db');
+              
+              alert("Actualizando sistema de notificaciones en tu dispositivo. La página se recargará una sola vez.");
+              window.location.reload();
+            } else {
+              console.error('[PUSH] La auto-curación ya se ejecutó en esta sesión y no funcionó.');
             }
-            // 2. Borrar las bases de datos de IndexedDB usadas por Firebase FCM e Installations
-            indexedDB.deleteDatabase('firebase-installations-database');
-            indexedDB.deleteDatabase('firebase-messaging-database');
-            indexedDB.deleteDatabase('fcm_token_details_db');
-            
-            alert("Hemos detectado una actualización crítica de seguridad en el sistema de notificaciones. La aplicación se recargará para aplicar los cambios y luego podrás habilitarlas de nuevo.");
-            window.location.reload();
           } catch (cleanupErr) {
             console.error('[PUSH] Error durante la auto-curación:', cleanupErr);
           }
