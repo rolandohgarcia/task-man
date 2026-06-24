@@ -48,6 +48,7 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
   const [targetDate, setTargetDate] = useState('');
   const [weekOfMonth, setWeekOfMonth] = useState(1);
   const [dayOfWeek, setDayOfWeek] = useState(1);
+  const [startDate, setStartDate] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [wasValidated, setWasValidated] = useState(false);
@@ -128,7 +129,8 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
   };
 
   const nextDatePreview1 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig());
-  const nextDatePreview2 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), nextDatePreview1);
+  const finalFirstDate = startDate || nextDatePreview1;
+  const nextDatePreview2 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), finalFirstDate);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -165,7 +167,7 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
       }
 
       const config = getRecurrenceConfig();
-      const firstScheduledDate = calculateNextScheduledDate(recurrenceType, config);
+      const firstScheduledDate = startDate || calculateNextScheduledDate(recurrenceType, config);
 
       await createRecurringTask({
         projectId,
@@ -344,11 +346,14 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, onClose, 
               </div>
 
               <div style={{ marginTop: 'var(--spacing-md)' }}>
-                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--success-color)', fontWeight: 'bold' }}>
-                  Próxima fecha generada: {nextDatePreview1}
+                <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Fecha de Inicio de Recurrencia (Opcional)</label>
+                <p style={{ margin: 0, marginTop: '4px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Si se deja vacío, la primera tarea se programará automáticamente para: <strong style={{ color: 'var(--success-color)' }}>{nextDatePreview1}</strong>
                 </p>
-                <p style={{ margin: 0, marginTop: '4px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                  Siguiente fecha generada: {nextDatePreview2}
+                <input type="date" className="input" value={startDate} min={todayStr} onChange={e => setStartDate(e.target.value)} style={{ marginTop: '8px' }} />
+                
+                <p style={{ margin: 0, marginTop: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Siguiente fecha después de la inicial: {nextDatePreview2}
                 </p>
               </div>
 
