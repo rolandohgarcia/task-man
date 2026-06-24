@@ -130,6 +130,12 @@ const ProjectView = ({ user }: ProjectViewProps) => {
   // To check if current user is admin of the project
   const isAdmin = project?.adminIds.includes(user.uid);
 
+  // Derive usersMap from companyMembers for easy lookup in cards
+  const usersMap = companyMembers.reduce((acc, member) => {
+    acc[member.id] = member;
+    return acc;
+  }, {} as Record<string, UserProfile>);
+
   return (
     <div className="container flex-col" style={{ paddingBottom: 'var(--spacing-xl)' }}>
       <div className="flex-row" style={{ justifyContent: 'space-between', borderBottom: '2px solid var(--border-color)', paddingBottom: 'var(--spacing-sm)' }}>
