@@ -295,54 +295,57 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
           )}
         </div>
 
-        <h3 style={{ margin: '8px 0 4px 0', color: isOverdue ? 'var(--danger-color)' : 'var(--text-color)' }}>
-          {isOverdue && <Clock size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }}/>}
-          {task.title}
-        </h3>
-        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>
-          {project?.name || 'Proyecto Desconocido'}
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px' }}>
+          {/* Left side: Title, Project, Description */}
+          <div style={{ flex: 1, paddingRight: '12px' }}>
+            <h3 style={{ margin: '0 0 4px 0', color: isOverdue ? 'var(--danger-color)' : 'var(--text-color)' }}>
+              {isOverdue && <Clock size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }}/>}
+              {task.title}
+            </h3>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>
+              {project?.name || 'Proyecto Desconocido'}
+            </span>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-color)', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+              {task.description || 'Sin descripción'}
+            </p>
+          </div>
 
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-color)', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {task.description || 'Sin descripción'}
-        </p>
-
-        {/* Footer info: Creator, Date and Assigned Users */}
-        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            {task.createdBy && (
-              <span style={{ display: 'block', marginBottom: '4px' }}>
-                Creado por: <strong>{usersMap[task.createdBy]?.displayName || 'Desconocido'}</strong>
+          {/* Right side: Avatars, Date, Creator */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+            {task.assignedUserIds && task.assignedUserIds.length > 0 && (
+              <div className="flex-row" style={{ gap: '4px', marginBottom: '4px' }}>
+                {task.assignedUserIds.map(uid => {
+                  const member = usersMap[uid];
+                  return (
+                    <div 
+                      key={uid} 
+                      title={member?.displayName || 'Desconocido'} 
+                      style={{ 
+                        width: '24px', height: '24px', borderRadius: '50%', 
+                        backgroundColor: 'var(--border-color)', display: 'flex', 
+                        alignItems: 'center', justifyContent: 'center', 
+                        fontSize: '0.7rem' 
+                      }}
+                    >
+                      {member?.emoji || (member?.displayName ? member.displayName.charAt(0).toUpperCase() : '?')}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            
+            {task.createdAt && (
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                {new Date(task.createdAt?.toDate ? task.createdAt.toDate() : task.createdAt).toLocaleDateString()}
               </span>
             )}
-            {task.createdAt && (
-              <span style={{ display: 'block' }}>
-                Fecha: {new Date(task.createdAt?.toDate ? task.createdAt.toDate() : task.createdAt).toLocaleDateString()}
+            
+            {task.createdBy && (
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                Por: <strong>{usersMap[task.createdBy]?.displayName?.split(' ')[0] || 'Desconocido'}</strong>
               </span>
             )}
           </div>
-          
-          {task.assignedUserIds && task.assignedUserIds.length > 0 && (
-            <div className="flex-row" style={{ gap: '4px' }}>
-              {task.assignedUserIds.map(uid => {
-                const member = usersMap[uid];
-                return (
-                  <div 
-                    key={uid} 
-                    title={member?.displayName || 'Desconocido'} 
-                    style={{ 
-                      width: '24px', height: '24px', borderRadius: '50%', 
-                      backgroundColor: 'var(--border-color)', display: 'flex', 
-                      alignItems: 'center', justifyContent: 'center', 
-                      fontSize: '0.7rem' 
-                    }}
-                  >
-                    {member?.emoji || (member?.displayName ? member.displayName.charAt(0).toUpperCase() : '?')}
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
     );
