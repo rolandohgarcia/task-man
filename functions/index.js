@@ -221,7 +221,7 @@ exports.onTaskCreated = functions.firestore
     };
 
     try {
-      const response = await admin.messaging().sendMulticast({
+      const response = await admin.messaging().sendEachForMulticast({
         tokens: tokens,
         ...payload
       });
