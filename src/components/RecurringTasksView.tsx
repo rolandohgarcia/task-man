@@ -93,7 +93,7 @@ const RecurringTasksView = ({ user, companyId, projectId }: RecurringTasksViewPr
       ) : (
         <div className="flex-col">
           {tasks.map(task => (
-            <div key={task.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderColor: 'var(--border-color)', borderLeftWidth: '6px', borderLeftColor: 'var(--success-color)' }}>
+            <div key={task.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderColor: 'var(--success-color)', borderLeftWidth: '6px', borderLeftColor: 'var(--success-color)' }}>
               <div style={{ flex: 1, paddingRight: 'var(--spacing-md)' }}>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', marginBottom: '4px' }}>{task.title}</h3>
                 <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
