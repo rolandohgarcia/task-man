@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, CheckCircle, Clock, Filter, AlertCircle, CalendarDays, Repeat, Trash2, ClipboardList, Eye, Building2, ChevronLeft, ChevronRight, Edit2, CalendarOff, Flame, AlertTriangle, ArrowDown, Check, Square } from 'lucide-react';
-import { subscribeToGlobalUserTasks, subscribeToGlobalSupervisedTasks, subscribeToGlobalRecurringTasks, deleteRecurringTask } from '../services/taskService';
+import { subscribeToGlobalUserTasks, subscribeToGlobalSupervisedTasks, subscribeToGlobalRecurringTasks, deleteRecurringTask, calculateNextScheduledDate } from '../services/taskService';
 import type { Task, RecurringTask } from '../services/taskService';
 import { getUserCompanies } from '../services/companyService';
 import { groupTasksByDate } from '../utils/taskGrouping';
@@ -36,7 +36,9 @@ interface GlobalTasksViewProps {
 const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'mine' | 'supervised' | 'recurring' | 'calendar'>(() => {
-    return (localStorage.getItem('globalActiveTab') as any) || 'mine';
+    const saved = localStorage.getItem('globalActiveTab') as any;
+    if (saved === 'calendar') return 'mine'; // Ocultar fallback temporalmente
+    return saved || 'mine';
   });
   
   const [myTasks, setMyTasks] = useState<Task[]>([]);
@@ -184,19 +186,53 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
     };
   });
 
+  const projectedEvents: any[] = [];
+  if (activeTab === 'calendar') {
+    recurringTasks.forEach(rt => {
+       let currentNext = rt.nextScheduledDate;
+       for (let i = 0; i < 3; i++) {
+         if (!currentNext) break;
+         const start = parse(currentNext, 'yyyy-MM-dd', new Date());
+         start.setHours(0,0,0,0);
+         const end = addDays(start, rt.durationDays !== undefined ? rt.durationDays : 1);
+         end.setHours(23, 59, 59, 999);
+         
+         projectedEvents.push({
+           id: `proj_${rt.id}_${i}`,
+           title: `🔄 ${rt.title}`,
+           start,
+           end,
+           allDay: true,
+           resource: { ...rt, isProjected: true }
+         });
+         
+         currentNext = calculateNextScheduledDate(rt.recurrenceType, rt.recurrenceConfig, currentNext);
+       }
+    });
+  }
+
+  const allEvents = [...calendarEvents, ...projectedEvents];
+
   const eventPropGetter = (event: any) => {
-    const task = event.resource as Task;
+    const task = event.resource;
     const project = projectsMap[task.projectId];
-    const backgroundColor = project?.color || 'var(--primary-color)';
+    const pColor = project?.color || 'var(--primary-color)';
+    
+    const backgroundColor = task.isProjected ? 'var(--bg-color)' : pColor;
+    const border = task.isProjected ? `1px solid ${pColor}` : 'none';
+    const color = task.isProjected ? 'var(--text-color)' : 'white';
+    const opacity = task.isProjected ? 0.7 : 0.9;
+    
     return { 
       style: { 
         backgroundColor, 
+        border,
+        color,
         borderRadius: '4px', 
-        opacity: 0.9,
+        opacity,
         fontSize: '0.7rem',
         padding: '1px 4px',
         lineHeight: '1.2',
-        border: 'none',
         minHeight: '16px'
       } 
     };
@@ -408,6 +444,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
             <Repeat size={22} />
           </button>
 
+          {/* Oculto temporalmente a petición del usuario
           <button 
             onClick={() => setActiveTab('calendar')} title="Calendario"
             style={{ 
@@ -420,6 +457,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
           >
             <CalendarDays size={22} />
           </button>
+          */}
         </div>
 
         {/* Right side: Filters */}
@@ -489,7 +527,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
               <div style={{ flex: 1, padding: '8px 16px' }}>
                 <Calendar
                   localizer={localizer}
-                  events={calendarEvents}
+                  events={allEvents}
                   startAccessor="start"
                   endAccessor="end"
                   style={{ height: '100%', fontFamily: 'inherit' }}
@@ -566,7 +604,7 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
                 return checkDate.getTime() >= start.getTime() && checkDate.getTime() <= end.getTime();
               });
 
-              if (agendaTasks.length === 0) {
+              if (agendaTasks.length === 0 && projectedEvents.length === 0) {
                 return (
                   <div style={{ textAlign: 'center', marginTop: 'var(--spacing-xl)', color: 'var(--text-muted)' }}>
                     <CalendarDays size={48} style={{ opacity: 0.5, marginBottom: 'var(--spacing-md)' }} />
@@ -575,7 +613,42 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
                 );
               }
 
-              return agendaTasks.map(task => renderTaskCard(task));
+              const projectedAgenda = projectedEvents.filter(t => {
+                return checkDate.getTime() >= t.start.getTime() && checkDate.getTime() <= t.end.getTime();
+              });
+
+              return (
+                <>
+                  {agendaTasks.map(task => renderTaskCard(task))}
+                  {projectedAgenda.length > 0 && (
+                    <div style={{ marginTop: 'var(--spacing-md)' }}>
+                      <h4 style={{ color: 'var(--text-muted)', marginBottom: 'var(--spacing-sm)', fontSize: '0.9rem', textAlign: 'center' }}>Proyecciones Futuras</h4>
+                      {projectedAgenda.map(proj => {
+                        const project = projectsMap[proj.resource.projectId];
+                        const pColor = project?.color || 'var(--primary-color)';
+                        return (
+                          <div key={proj.id} className="card" style={{ 
+                            marginBottom: 'var(--spacing-sm)', 
+                            borderLeft: `4px dashed ${pColor}`,
+                            opacity: 0.8,
+                            backgroundColor: 'transparent'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-color)' }}>{proj.title}</h3>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '16px', marginTop: '4px' }}>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Building2 size={12} /> {companies.find(c => c.id === proj.resource.companyId)?.name || 'Empresa'}</span>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Square size={12} fill={pColor} color={pColor} /> {project?.name || 'Proyecto'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              );
             })()}
           </div>
         )

@@ -144,6 +144,17 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, editTask,
   const nextDatePreview2 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), nextDatePreview1);
   const nextDatePreview3 = calculateNextScheduledDate(recurrenceType, getRecurrenceConfig(), nextDatePreview2);
 
+  const renderPreview = (dateStr: string) => {
+    if (endDate && dateStr > endDate) return <span style={{ color: 'var(--danger-color)', fontStyle: 'italic' }}>Cancelada (Excede fecha límite)</span>;
+    const deadlineDate = addDays(new Date(dateStr + 'T00:00:00'), isNaN(durationDays) ? 0 : durationDays);
+    const deadlineStr = format(deadlineDate, 'yyyy-MM-dd');
+    return (
+      <span>
+        {dateStr} <span style={{ opacity: 0.7, fontSize: '0.75rem', marginLeft: '4px' }}>| Límite: {deadlineStr}</span>
+      </span>
+    );
+  };
+
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
@@ -435,9 +446,9 @@ const RecurringTaskForm = ({ user, defaultProjectId, defaultCompanyId, editTask,
                 <div style={{ padding: '12px', backgroundColor: 'var(--background-color)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-color)' }}>Previsualización de la agenda:</p>
                   <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    <li><strong style={{ color: 'var(--success-color)' }}>1ª Ejecución:</strong> {endDate && nextDatePreview1 > endDate ? <span style={{ color: 'var(--danger-color)', fontStyle: 'italic' }}>Cancelada (Excede fecha límite)</span> : nextDatePreview1}</li>
-                    <li><strong>2ª Ejecución:</strong> {endDate && nextDatePreview2 > endDate ? <span style={{ color: 'var(--danger-color)', fontStyle: 'italic' }}>Cancelada (Excede fecha límite)</span> : nextDatePreview2}</li>
-                    <li><strong>3ª Ejecución:</strong> {endDate && nextDatePreview3 > endDate ? <span style={{ color: 'var(--danger-color)', fontStyle: 'italic' }}>Cancelada (Excede fecha límite)</span> : nextDatePreview3}</li>
+                    <li><strong style={{ color: 'var(--success-color)' }}>1ª Ejecución:</strong> {renderPreview(nextDatePreview1)}</li>
+                    <li><strong>2ª Ejecución:</strong> {renderPreview(nextDatePreview2)}</li>
+                    <li><strong>3ª Ejecución:</strong> {renderPreview(nextDatePreview3)}</li>
                   </ul>
                 </div>
               </div>
