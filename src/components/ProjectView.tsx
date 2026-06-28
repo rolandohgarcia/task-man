@@ -226,7 +226,7 @@ const ProjectView = ({ user }: ProjectViewProps) => {
                       const borderColor = isOverdue ? 'var(--danger-color)' : 'var(--primary-color)';
                       
                       return (
-                        <div key={task.id} className="card flex-row" style={{ justifyContent: 'space-between', alignItems: 'center', borderColor: borderColor, borderLeftWidth: isOverdue ? '22px' : '18px', borderLeftColor: borderColor, backgroundColor: isOverdue ? 'rgba(204, 0, 0, 0.03)' : 'var(--surface-color)' }}>
+                        <div key={task.id} className="card flex-row" style={{ justifyContent: 'space-between', alignItems: 'center', borderColor: 'var(--border-color)', borderLeft: `6px solid ${isOverdue ? 'var(--danger-color)' : borderColor}`, backgroundColor: isOverdue ? 'rgba(239, 68, 68, 0.04)' : 'var(--surface-color)' }}>
                           <div className="flex-col" style={{ gap: 'var(--spacing-xs)', flex: 1 }}>
                             <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                               {task.title}

@@ -300,9 +300,8 @@ const GlobalTasksView = ({ user }: GlobalTasksViewProps) => {
         onClick={() => navigate(`/company/${project?.companyId || 'unknown'}/project/${task.projectId}/task/${task.id}`)}
         style={{ 
           cursor: 'pointer', 
-          borderLeft: isOverdue ? `22px solid ${borderColor}` : `18px solid ${borderColor}`,
-          borderColor: borderColor,
-          backgroundColor: isOverdue ? 'rgba(204, 0, 0, 0.03)' : 'var(--surface-color)',
+          borderLeft: `6px solid ${isOverdue ? 'var(--danger-color)' : borderColor}`,
+          backgroundColor: isOverdue ? 'rgba(239, 68, 68, 0.04)' : 'var(--surface-color)',
           position: 'relative',
           paddingLeft: 'var(--spacing-md)'
         }}
